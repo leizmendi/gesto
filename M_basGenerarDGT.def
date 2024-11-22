@@ -1,0 +1,201 @@
+Option Compare Database
+Option Explicit
+    Global grsEnl As Recordset
+
+Public Function GenerarFicheroDGT_M(Optional lngIdEnlaceM As Long = 0, Optional intAbrirFichero As Integer = True, Optional intCerrarFichero As Integer = True) As Integer
+    ' Genera fichero.DGT. Si lngIdEnlaceM=0 enlaza todos los registros pendientes de traspasar
+    ' si no el registro indicado
+    ' Devuelve nº de registros incluidos en el fichero de enlace
+    On Error GoTo Error_GenerarFicheroDGT_M
+    Dim strSQL As String, stLin As String
+    Static i As Integer, strFile As String, lngNumDoc As Long
+    Dim strMensaje As String, varReturn As Variant
+    strSQL = "SELECT * FROM tbEnlaceMatriculaciones"
+    If lngIdEnlaceM = 0 Then
+        strSQL = strSQL & " WHERE TraspasadoSN = False"
+    Else
+        strSQL = strSQL & " WHERE IdEnlaceM = " & lngIdEnlaceM
+    End If
+    Set grsEnl = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    If intAbrirFichero Then
+        i = 0
+        lngNumDoc = 0
+        If AbrirFicheroDGT_M(strFile) = False Then
+            MsgBox "No se pudo abrir el fichero"
+            Exit Function
+        End If
+    End If
+    If lngNumDoc = 0 Then
+        lngNumDoc = CLng(Right(NuloEs(DMax("NumDocumento", "tMatriculaciones"), "000000"), 6))
+    End If
+    While Not grsEnl.EOF
+        If IsNull(grsEnl("NumDocumento")) Then
+            lngNumDoc = lngNumDoc + 1
+            grsEnl.Edit
+            grsEnl("NumDocumento") = Format(Date, "yyyy") & Format(lngNumDoc, "000000")
+            grsEnl.Update
+        End If
+        GenerarLineaM stLin
+        Print #1, stLin
+        i = i + 1
+        If grsEnl("TraspasadoSN") = False Then
+            grsEnl.Edit
+            grsEnl("TraspasadoSN") = True
+            grsEnl.Update
+        End If
+        strMensaje = "Creando Fichero " & strFile & " ... " & i
+        varReturn = SysCmd(acSysCmdSetStatus, strMensaje)
+        grsEnl.MoveNext
+    Wend
+    If intCerrarFichero = True Then
+        GenerarFicheroDGT_M = i
+        Close
+        If i = 0 Then
+            Kill strFile
+            MsgBox "No se encontraron registros de matriculaciones pendientes de traspasar", vbExclamation
+        Else
+            MsgBox "Se ha generado Fichero: " & strFile & " en el que se han incluido " & i & " registros de matriculaciones"
+        End If
+    End If
+Salir_GenerarFicheroDGT_M:
+    Set grsEnl = Nothing
+    varReturn = SysCmd(acSysCmdClearStatus)
+    Exit Function
+Error_GenerarFicheroDGT_M:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en GenerarFicheroDGT_M" & vbCrLf & Err.Description
+            Close
+            Resume Salir_GenerarFicheroDGT_M
+    End Select
+End Function
+
+Private Sub GenerarLineaM(strLin As String)
+    On Error GoTo Error_GenerarLineaM
+    strLin = grsEnl("TipoRegistro")
+    strLin = strLin & LlenaIzqChar(NuloEs(grsEnl("DigitosTasa"), ""), 12, "0")
+    If IsDate(grsEnl("FechaPresentacion")) Then
+        strLin = strLin & Format(grsEnl("FechaPresentacion"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    strLin = strLin & LlenaIzq(grsEnl("Jefatura"), 2)
+    strLin = strLin & LlenaIzq(grsEnl("Matricula"), 9)
+    If IsDate(grsEnl("FechaMatriculacion")) Then
+        strLin = strLin & Format(grsEnl("FechaMatriculacion"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    If IsDate(grsEnl("FechaITV")) Then
+        strLin = strLin & Format(grsEnl("FechaITV"), "yyyymmdd")
+    Else
+        strLin = strLin & "18991230"
+    End If
+    strLin = strLin & LlenaIzq(grsEnl("DNITitular"), 9)
+    strLin = strLin & LlenaIzq(grsEnl("Apellido1Titular"), 70)
+    strLin = strLin & LlenaIzq(grsEnl("Apellido2Titular"), 26)
+    strLin = strLin & LlenaIzq(grsEnl("NombreTitular"), 18)
+    strLin = strLin & LlenaIzq(grsEnl("DomicilioTitular"), 26)
+    strLin = strLin & LlenaIzq(grsEnl("MunicipioTitular"), 24)
+    strLin = strLin & LlenaIzq(grsEnl("PuebloTitular"), 24)
+    strLin = strLin & LlenaIzq(grsEnl("ProvinciaTitular"), 2)
+    strLin = strLin & LlenaIzq(grsEnl("CodigoPostalTitular"), 5)
+    strLin = strLin & LlenaIzq(grsEnl("SexoTitular"), 1)
+    If IsDate(grsEnl("FechaNacimientoTitular")) Then
+        strLin = strLin & Format(grsEnl("FechaNacimientoTitular"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    strLin = strLin & LlenaIzq("3100525040" & grsEnl("NumDocumento"), 30)
+    strLin = strLin & LlenaIzq(grsEnl("DatosDocumentoTitular"), 70)
+    strLin = strLin & LlenaIzq(grsEnl("NombreRepresentanteTitular"), 70)
+    strLin = strLin & LlenaIzq(grsEnl("DNIRepresentanteTitular"), 9)
+    strLin = strLin & LlenaIzq(grsEnl("ConceptoRepresentante"), 70)
+    strLin = strLin & LlenaIzq(grsEnl("MarcaVehiculo"), 23)
+    strLin = strLin & LlenaIzq(grsEnl("ModeloVehiculo"), 22)
+    strLin = strLin & LlenaIzq(grsEnl("Bastidor"), 21)
+    strLin = strLin & LlenaIzq(grsEnl("Procedencia"), 1)
+    strLin = strLin & LlenaIzq(grsEnl("Color"), 2)
+    strLin = strLin & LlenaIzq(grsEnl("TipoVehiculo"), 2)
+    strLin = strLin & LlenaIzq(grsEnl("Carburante"), 2)
+    strLin = strLin & LlenaIzqChar(QuitaChar(grsEnl("Potencia"), ","), 5, "0")
+    strLin = strLin & LlenaIzqChar(grsEnl("Cilindrada"), 5, "0")
+    strLin = strLin & LlenaIzqChar(grsEnl("Tara"), 6, "0")
+    strLin = strLin & LlenaIzqChar(grsEnl("Masa"), 6, "0")
+    strLin = strLin & LlenaIzqChar(grsEnl("Plazas"), 3, "0")
+    strLin = strLin & LlenaIzq(grsEnl("MatriculaAyuntamiento"), 12)
+    strLin = strLin & LlenaIzq(IIf(grsEnl("ExcesoPesoSN") = True, "SI", ""), 2)
+    If IsDate(grsEnl("FechaLimiteMatriculaTuristica")) Then
+        strLin = strLin & Format(grsEnl("FechaLimiteMatriculaTuristica"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    If IsDate(grsEnl("FechaPrimeraMatriculacion")) Then
+        strLin = strLin & Format(grsEnl("FechaPrimeraMatriculacion"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    strLin = strLin & LlenaIzq(grsEnl("Servicio"), 1)
+    strLin = strLin & LlenaIzq(IIf(grsEnl("TutelaSN") = True, "SI", ""), 2)
+    strLin = strLin & LlenaIzq(IIf(grsEnl("MatriculaDiplomaticaSN") = True, "SI", ""), 2)
+    strLin = strLin & LlenaIzq(grsEnl("TipoLimitacionDisposicion"), 1)
+    If IsDate(grsEnl("FechaLimitacion")) Then
+        strLin = strLin & Format(grsEnl("FechaLimitacion"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    strLin = strLin & LlenaIzq(grsEnl("NumRegistroLimitacion"), 10)
+    strLin = strLin & LlenaIzq(grsEnl("FinancieraLimitacion"), 30)
+    strLin = strLin & LlenaIzq(grsEnl("DomicilioVehiculo"), 26)
+    strLin = strLin & LlenaIzq(grsEnl("ProvinciaVehiculo"), 2)
+    strLin = strLin & LlenaIzq(grsEnl("MunicipioVehiculo"), 24)
+    strLin = strLin & LlenaIzq(grsEnl("PuebloVehiculo"), 24)
+    strLin = strLin & LlenaIzq(grsEnl("CodigoPostalVehiculo"), 5)
+    strLin = strLin & LlenaIzqChar(NuloEs(DameValorParam("EnlacesNumProfesional"), "00000"), 5, "0")
+    strLin = strLin & LlenaIzq(grsEnl("6UltimosDigitos"), 6)
+    If IsDate(grsEnl("FechaCreacionDocumento")) Then
+        strLin = strLin & Format(grsEnl("FechaCreacionDocumento"), "yyyymmdd")
+    Else
+        strLin = strLin & LlenaIzq("", 8)
+    End If
+    strLin = strLin & LlenaIzq("", 8)
+    strLin = strLin & LlenaIzq(grsEnl("Observaciones"), 255)
+    
+Salir_GenerarLineaM:
+    Exit Sub
+Error_GenerarLineaM:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en GenerarLineaM" & vbCrLf & Err.Description
+            Resume Salir_GenerarLineaM
+    End Select
+End Sub
+
+
+Public Function AbrirFicheroDGT_M(ByRef strFile As String) As Integer
+    ' Genera fichero.DGT. Abre el fichero y escribe la 1ª línea
+    ' Devuelve true si no hay error
+    ' queda fichero abierto #1
+    On Error GoTo Error_AbrirFicheroDGT_M
+    Dim strSQL As String, stLin As String, i As Integer
+    Dim strMensaje As String, varReturn As Variant
+    AbrirFicheroDGT_M = False
+    strFile = NuloEs(DameValorParam("EnlacesMatriculacionesCarpetaFicheroDGT"), "C:\")
+    If Right(strFile, 1) <> "\" Then strFile = strFile & "\"
+    strFile = strFile & "EnlaceM_" & Format(Now(), "yyyymmddhhnnss") & ".DGT"
+    Open strFile For Output As #1
+    'grabar 1er. registro
+    stLin = "PDF"
+    stLin = stLin & LlenaIzqChar(NuloEs(DameValorParam("EnlacesNumProfesional"), "00000"), 5, "0")
+    stLin = stLin & LlenaIzq(NuloEs(DameValorParam("EnlacesGestoria"), "GESTORIA XXXXX"), 50)
+    Print #1, stLin
+    AbrirFicheroDGT_M = True
+Salir_AbrirFicheroDGT_M:
+    Exit Function
+Error_AbrirFicheroDGT_M:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en AbrirFicheroDGT_M" & vbCrLf & Err.Description
+            Resume Salir_AbrirFicheroDGT_M
+    End Select
+End Function

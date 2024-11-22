@@ -1,0 +1,54 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function AjustarColumnas(frm As Object)
+    Dim rs As Recordset
+'    If AbiertoDatasheet = False Then Exit Function
+    On Error GoTo Error_AjustarColumnas
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM sysAnchuras WHERE Formulario = '" & frm.Name & "'")
+    While Not rs.EOF
+        frm.Controls((rs("Campo"))).ColumnHidden = Not rs("VisibleColumna")
+        If frm.Controls((rs("Campo"))).ColumnOrder <> 0 Then
+            frm.Controls((rs("Campo"))).ColumnOrder = rs("OrdenColumna")
+        End If
+        frm.Controls((rs("Campo"))).ColumnWidth = rs("AnchuraColumna")
+        rs.MoveNext
+    Wend
+Salir_AjustarColumnas:
+    Exit Function
+Error_AjustarColumnas:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en AjustarColumnas" & vbCrLf & Err.Description
+            Resume Salir_AjustarColumnas
+            Resume Next
+    End Select
+End Function
+Public Function CambiarColumnas(frm As Object)
+    Dim rs As Recordset
+'    If AbiertoDatasheet = False Then Exit Function
+    On Error GoTo Error_CambiarColumnas
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM sysAnchuras WHERE Formulario = '" & frm.Name & "' AND (CambioAnchura = True OR CambioVisible = True)")
+    While Not rs.EOF
+        If rs("CambioVisible") = True Then
+            frm.Controls((rs("Campo"))).ColumnHidden = Not frm.Controls((rs("Campo"))).ColumnHidden
+        End If
+        If rs("CambioAnchura") = True Then
+            If frm.Controls((rs("Campo"))).ColumnWidth = rs("AnchuraColumna") Then
+                frm.Controls((rs("Campo"))).ColumnWidth = rs("AnchuraColumna2")
+            Else
+                frm.Controls((rs("Campo"))).ColumnWidth = rs("AnchuraColumna")
+            End If
+        End If
+        rs.MoveNext
+    Wend
+Salir_CambiarColumnas:
+    Exit Function
+Error_CambiarColumnas:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en CambiarColumnas" & vbCrLf & Err.Description
+            Resume Salir_CambiarColumnas
+    End Select
+End Function

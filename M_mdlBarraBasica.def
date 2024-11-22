@@ -1,0 +1,30 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function Cerrar()
+    On Error GoTo Error_Cerrar
+    On Error Resume Next
+    Dim strRep As String
+    'Ver si hay un informe activo
+    strRep = Screen.ActiveReport.Name
+    If Err = 0 Then
+        DoCmd.Close acReport, strRep
+        Exit Function
+    End If
+    On Error GoTo Error_Cerrar
+    If Application.CurrentObjectName = "frmMenu" Or Application.CurrentObjectName = "Inicio" Then
+        Dim intResp As Integer
+        intResp = MsgBox("¿Cerrar Programa?", vbQuestion + vbOKCancel + vbDefaultButton1, "Salir del programa")
+        If intResp = vbOK Then
+            DoCmd.Quit
+        End If
+    Else
+        DoCmd.Close
+    End If
+Exit_Cerrar:
+    Exit Function
+Error_Cerrar:
+    MsgBox "Error nº " & Err.Number & " - " & Err.Description & Chr(13) & Chr(10) & "En Cerrar"
+    Resume Exit_Cerrar
+End Function

@@ -1,0 +1,571 @@
+Option Compare Database
+Option Explicit
+
+Public Function DimeAlbaranTotalBase(lngIdAlbaran As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeAlbaranTotalBase
+    If lngIdAlbaran = 0 Then
+        DimeAlbaranTotalBase = 0
+        GoTo Salir_DimeAlbaranTotalBase
+    End If
+    v = DLookup("IvaIncluido", "tbAlbaranesCab", "IdAlbaranCab = " & lngIdAlbaran)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("(Cantidad * Precio)/(1 + IVA + RecEQ)", "tbAlbaranesDet", "IdAlbaranCab = " & lngIdAlbaran), 0)
+    Else
+        curTotal = NuloEs(DSum("Cantidad * Precio", "tbAlbaranesDet", "IdAlbaranCab = " & lngIdAlbaran), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimeAlbaranTotalBase = curTotal
+Salir_DimeAlbaranTotalBase:
+    Exit Function
+Error_DimeAlbaranTotalBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeAlbaranTotalBase" & vbCrLf & Err.Description
+            Resume Salir_DimeAlbaranTotalBase
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeAlbaranTotalSQLBase(strSQL As String) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    Dim rs As Recordset
+    On Error GoTo Error_DimeAlbaranTotalSQLBase
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    While Not rs.EOF
+        curTotal = curTotal + DimeAlbaranTotalBase(rs("IdAlbaranCab"))
+        rs.MoveNext
+    Wend
+    DimeAlbaranTotalSQLBase = curTotal
+Salir_DimeAlbaranTotalSQLBase:
+    Exit Function
+Error_DimeAlbaranTotalSQLBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeAlbaranTotalSQLBase" & vbCrLf & Err.Description
+            Resume Salir_DimeAlbaranTotalSQLBase
+            Resume Next
+    End Select
+End Function
+Public Function DimeAlbaranTotalIVA(lngIdAlbaran As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeAlbaranTotalIVA
+    If lngIdAlbaran = 0 Then
+        DimeAlbaranTotalIVA = 0
+        GoTo Salir_DimeAlbaranTotalIVA
+    End If
+    v = DLookup("IvaIncluido", "tbAlbaranesCab", "IdAlbaranCab = " & lngIdAlbaran)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("((Cantidad * Precio) / (1 + IVA + RecEQ)) * (IVA + RecEQ)", "tbAlbaranesDet", "IdAlbaranCab = " & lngIdAlbaran), 0)
+    Else
+        curTotal = NuloEs(DSum("(Cantidad * Precio) * (IVA + RecEQ)", "tbAlbaranesDet", "IdAlbaranCab = " & lngIdAlbaran), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimeAlbaranTotalIVA = curTotal
+Salir_DimeAlbaranTotalIVA:
+    Exit Function
+Error_DimeAlbaranTotalIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeAlbaranTotalIVA" & vbCrLf & Err.Description
+            Resume Salir_DimeAlbaranTotalIVA
+    End Select
+End Function
+
+Public Function DimeFacturaTotalBase(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaTotalBase
+    If lngIdFactura = 0 Then
+        DimeFacturaTotalBase = 0
+        GoTo Salir_DimeFacturaTotalBase
+    End If
+    v = DLookup("IvaIncluido", "tbFacturasCab", "IdFacturaCab = " & lngIdFactura)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("(Cantidad * Precio)/(1 + IVA + RecEQ)", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    Else
+        curTotal = NuloEs(DSum("Cantidad * Precio", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimeFacturaTotalBase = curTotal
+Salir_DimeFacturaTotalBase:
+    Exit Function
+Error_DimeFacturaTotalBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaTotalBase" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaTotalBase
+            Resume Next
+    End Select
+End Function
+Public Function DimeFacturaTotalSQLBase(strSQL As String) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    Dim rs As Recordset
+    On Error GoTo Error_DimeFacturaTotalSQLBase
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    While Not rs.EOF
+        curTotal = curTotal + DimeFacturaTotalBase(rs("IdFacturaCab"))
+        rs.MoveNext
+    Wend
+    DimeFacturaTotalSQLBase = curTotal
+Salir_DimeFacturaTotalSQLBase:
+    Exit Function
+Error_DimeFacturaTotalSQLBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaTotalSQLBase" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaTotalSQLBase
+            Resume Next
+    End Select
+End Function
+Public Function DimeFacturaTotalIVA(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaTotalIVA
+    If lngIdFactura = 0 Then
+        DimeFacturaTotalIVA = 0
+        GoTo Salir_DimeFacturaTotalIVA
+    End If
+    v = DLookup("IvaIncluido", "tbFacturasCab", "IdFacturaCab = " & lngIdFactura)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("((Cantidad * Precio) / (1 + IVA + RecEQ)) * (IVA)", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    Else
+        curTotal = NuloEs(DSum("(Cantidad * Precio) * (IVA)", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimeFacturaTotalIVA = curTotal
+Salir_DimeFacturaTotalIVA:
+    Exit Function
+Error_DimeFacturaTotalIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaTotalIVA" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaTotalIVA
+    End Select
+End Function
+
+
+Public Function DimeFacturaTotalRecEq(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaTotalRecEq
+    If lngIdFactura = 0 Then
+        DimeFacturaTotalRecEq = 0
+        GoTo Salir_DimeFacturaTotalRecEq
+    End If
+    v = DLookup("IvaIncluido", "tbFacturasCab", "IdFacturaCab = " & lngIdFactura)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("((Cantidad * Precio) / (1 + IVA + RecEQ)) * (RecEq)", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    Else
+        curTotal = NuloEs(DSum("(Cantidad * Precio) * (RecEq)", "tbFacturasDet", "IdFacturaCab = " & lngIdFactura), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimeFacturaTotalRecEq = curTotal
+Salir_DimeFacturaTotalRecEq:
+    Exit Function
+Error_DimeFacturaTotalRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaTotalRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaTotalRecEq
+    End Select
+End Function
+Public Function DimeFacturaIVA(lngIdFactura As Long) As Variant
+    Dim sngIVA As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimeFacturaIVA
+    If lngIdFactura = 0 Then
+        DimeFacturaIVA = 0
+        GoTo Salir_DimeFacturaIVA
+    End If
+    strSQL = "SELECT tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA"
+    strSQL = strSQL & " FROM tbFacturasDet"
+    strSQL = strSQL & " WHERE IdFacturaCab = " & lngIdFactura
+    strSQL = strSQL & " GROUP BY tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimeFacturaIVA = 0
+        GoTo Salir_DimeFacturaIVA
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimeFacturaIVA = Null
+    Else
+        DimeFacturaIVA = rs("IVA")
+    End If
+Salir_DimeFacturaIVA:
+    Exit Function
+Error_DimeFacturaIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaIVA" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaIVA
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeFacturaRecEq(lngIdFactura As Long) As Variant
+    Dim sngRecEq As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimeFacturaRecEq
+    If lngIdFactura = 0 Then
+        DimeFacturaRecEq = 0
+        GoTo Salir_DimeFacturaRecEq
+    End If
+    strSQL = "SELECT tbFacturasDet.IdFacturaCab, tbFacturasDet.RecEq"
+    strSQL = strSQL & " FROM tbFacturasDet"
+    strSQL = strSQL & " WHERE IdFacturaCab = " & lngIdFactura
+    strSQL = strSQL & " GROUP BY tbFacturasDet.IdFacturaCab, tbFacturasDet.RecEq"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimeFacturaRecEq = 0
+        GoTo Salir_DimeFacturaRecEq
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimeFacturaRecEq = Null
+    Else
+        DimeFacturaRecEq = rs("RecEq")
+    End If
+Salir_DimeFacturaRecEq:
+    Exit Function
+Error_DimeFacturaRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecEq
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeFacturaRecibidaTotalBase(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaRecibidaTotalBase
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaTotalBase = 0
+        GoTo Salir_DimeFacturaRecibidaTotalBase
+    End If
+    curTotal = NuloEs(DSum("Base", "tbFacturasRecibidasDet", "IdFacturaRecibida = " & lngIdFactura), 0)
+    curTotal = Round(curTotal, 2)
+    DimeFacturaRecibidaTotalBase = curTotal
+Salir_DimeFacturaRecibidaTotalBase:
+    Exit Function
+Error_DimeFacturaRecibidaTotalBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaTotalBase" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaTotalBase
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeFacturaRecibidaTotalIVA(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaRecibidaTotalIVA
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaTotalIVA = 0
+        GoTo Salir_DimeFacturaRecibidaTotalIVA
+    End If
+    curTotal = NuloEs(DSum("(Base) * (IVA)", "tbFacturasRecibidasDet", "IdFacturaRecibida = " & lngIdFactura), 0)
+    curTotal = Round(curTotal, 2)
+    DimeFacturaRecibidaTotalIVA = curTotal
+Salir_DimeFacturaRecibidaTotalIVA:
+    Exit Function
+Error_DimeFacturaRecibidaTotalIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaTotalIVA" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaTotalIVA
+            Resume Next
+    End Select
+End Function
+Public Function DimeFacturaRecibidaTotalRecEq(lngIdFactura As Long) As Currency
+    Dim v As Variant, intRecEqInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaRecibidaTotalRecEq
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaTotalRecEq = 0
+        GoTo Salir_DimeFacturaRecibidaTotalRecEq
+    End If
+    curTotal = NuloEs(DSum("(Base) * (RecEq)", "tbFacturasRecibidasDet", "IdFacturaRecibida = " & lngIdFactura), 0)
+    curTotal = Round(curTotal, 2)
+    DimeFacturaRecibidaTotalRecEq = curTotal
+Salir_DimeFacturaRecibidaTotalRecEq:
+    Exit Function
+Error_DimeFacturaRecibidaTotalRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaTotalRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaTotalRecEq
+            Resume Next
+    End Select
+End Function
+
+
+Public Function DimeFacturaRecibidaIVA(lngIdFactura As Long) As Variant
+    Dim sngIVA As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimeFacturaRecibidaIVA
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaIVA = 0
+        GoTo Salir_DimeFacturaRecibidaIVA
+    End If
+    strSQL = "SELECT tbFacturasRecibidasDet.IdFacturaRecibida, tbFacturasRecibidasDet.IVA"
+    strSQL = strSQL & " FROM tbFacturasRecibidasDet"
+    strSQL = strSQL & " WHERE IdFacturaRecibida = " & lngIdFactura
+    strSQL = strSQL & " GROUP BY tbFacturasRecibidasDet.IdFacturaRecibida, tbFacturasRecibidasDet.IVA"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimeFacturaRecibidaIVA = 0
+        GoTo Salir_DimeFacturaRecibidaIVA
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimeFacturaRecibidaIVA = Null
+    Else
+        DimeFacturaRecibidaIVA = rs("IVA")
+    End If
+Salir_DimeFacturaRecibidaIVA:
+    Exit Function
+Error_DimeFacturaRecibidaIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaIVA" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaIVA
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeFacturaRecibidaRecEq(lngIdFactura As Long) As Variant
+    Dim sngRecEq As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimeFacturaRecibidaRecEq
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaRecEq = 0
+        GoTo Salir_DimeFacturaRecibidaRecEq
+    End If
+    strSQL = "SELECT tbFacturasRecibidasDet.IdFacturaRecibida, tbFacturasRecibidasDet.RecEq"
+    strSQL = strSQL & " FROM tbFacturasRecibidasDet"
+    strSQL = strSQL & " WHERE IdFacturaRecibida = " & lngIdFactura
+    strSQL = strSQL & " GROUP BY tbFacturasRecibidasDet.IdFacturaRecibida, tbFacturasRecibidasDet.RecEq"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimeFacturaRecibidaRecEq = 0
+        GoTo Salir_DimeFacturaRecibidaRecEq
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimeFacturaRecibidaRecEq = Null
+    Else
+        DimeFacturaRecibidaRecEq = rs("RecEq")
+    End If
+Salir_DimeFacturaRecibidaRecEq:
+    Exit Function
+Error_DimeFacturaRecibidaRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaRecEq
+            Resume Next
+    End Select
+End Function
+
+Public Function DimeFacturaRecibidaTotalRetencion(lngIdFactura As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimeFacturaRecibidaTotalRetencion
+    If lngIdFactura = 0 Then
+        DimeFacturaRecibidaTotalRetencion = 0
+        GoTo Salir_DimeFacturaRecibidaTotalRetencion
+    End If
+    curTotal = NuloEs(DSum("(Base) * (RetencionIRPF)", "tbFacturasRecibidasRet", "IdFacturaRecibida = " & lngIdFactura), 0)
+    curTotal = Round(curTotal, 2)
+    DimeFacturaRecibidaTotalRetencion = curTotal
+Salir_DimeFacturaRecibidaTotalRetencion:
+    Exit Function
+Error_DimeFacturaRecibidaTotalRetencion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeFacturaRecibidaTotalRetencion" & vbCrLf & Err.Description
+            Resume Salir_DimeFacturaRecibidaTotalRetencion
+            Resume Next
+    End Select
+End Function
+
+Public Function DimePresuTotalBase(lngIdPresu As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimePresuTotalBase
+    If lngIdPresu = 0 Then
+        DimePresuTotalBase = 0
+        GoTo Salir_DimePresuTotalBase
+    End If
+    v = DLookup("IvaIncluido", "tbPresuCab", "IdPresuCab = " & lngIdPresu)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("(Cantidad * Precio)/(1 + IVA + RecEQ)", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    Else
+        curTotal = NuloEs(DSum("Cantidad * Precio", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimePresuTotalBase = curTotal
+Salir_DimePresuTotalBase:
+    Exit Function
+Error_DimePresuTotalBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuTotalBase" & vbCrLf & Err.Description
+            Resume Salir_DimePresuTotalBase
+            Resume Next
+    End Select
+End Function
+Public Function DimePresuTotalSQLBase(strSQL As String) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    Dim rs As Recordset
+    On Error GoTo Error_DimePresuTotalSQLBase
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    While Not rs.EOF
+        curTotal = curTotal + DimePresuTotalBase(rs("IdPresuCab"))
+        rs.MoveNext
+    Wend
+    DimePresuTotalSQLBase = curTotal
+Salir_DimePresuTotalSQLBase:
+    Exit Function
+Error_DimePresuTotalSQLBase:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuTotalSQLBase" & vbCrLf & Err.Description
+            Resume Salir_DimePresuTotalSQLBase
+            Resume Next
+    End Select
+End Function
+Public Function DimePresuTotalIVA(lngIdPresu As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimePresuTotalIVA
+    If lngIdPresu = 0 Then
+        DimePresuTotalIVA = 0
+        GoTo Salir_DimePresuTotalIVA
+    End If
+    v = DLookup("IvaIncluido", "tbPresuCab", "IdPresuCab = " & lngIdPresu)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("((Cantidad * Precio) / (1 + IVA + RecEQ)) * (IVA)", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    Else
+        curTotal = NuloEs(DSum("(Cantidad * Precio) * (IVA)", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimePresuTotalIVA = curTotal
+Salir_DimePresuTotalIVA:
+    Exit Function
+Error_DimePresuTotalIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuTotalIVA" & vbCrLf & Err.Description
+            Resume Salir_DimePresuTotalIVA
+    End Select
+End Function
+
+
+Public Function DimePresuTotalRecEq(lngIdPresu As Long) As Currency
+    Dim v As Variant, intIvaInc As Integer, curTotal As Currency
+    On Error GoTo Error_DimePresuTotalRecEq
+    If lngIdPresu = 0 Then
+        DimePresuTotalRecEq = 0
+        GoTo Salir_DimePresuTotalRecEq
+    End If
+    v = DLookup("IvaIncluido", "tbPresuCab", "IdPresuCab = " & lngIdPresu)
+    intIvaInc = NuloEs(v, False)
+    If intIvaInc Then
+        curTotal = NuloEs(DSum("((Cantidad * Precio) / (1 + IVA + RecEQ)) * (RecEq)", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    Else
+        curTotal = NuloEs(DSum("(Cantidad * Precio) * (RecEq)", "tbPresuDet", "IdPresuCab = " & lngIdPresu), 0)
+    End If
+    curTotal = Round(curTotal, 2)
+    DimePresuTotalRecEq = curTotal
+Salir_DimePresuTotalRecEq:
+    Exit Function
+Error_DimePresuTotalRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuTotalRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimePresuTotalRecEq
+    End Select
+End Function
+Public Function DimePresuIVA(lngIdPresu As Long) As Variant
+    Dim sngIVA As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimePresuIVA
+    If lngIdPresu = 0 Then
+        DimePresuIVA = 0
+        GoTo Salir_DimePresuIVA
+    End If
+    strSQL = "SELECT tbPresuDet.IdPresuCab, tbPresuDet.IVA"
+    strSQL = strSQL & " FROM tbPresuDet"
+    strSQL = strSQL & " WHERE IdPresuCab = " & lngIdPresu
+    strSQL = strSQL & " GROUP BY tbPresuDet.IdPresuCab, tbPresuDet.IVA"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimePresuIVA = 0
+        GoTo Salir_DimePresuIVA
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimePresuIVA = Null
+    Else
+        DimePresuIVA = rs("IVA")
+    End If
+Salir_DimePresuIVA:
+    Exit Function
+Error_DimePresuIVA:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuIVA" & vbCrLf & Err.Description
+            Resume Salir_DimePresuIVA
+            Resume Next
+    End Select
+End Function
+
+Public Function DimePresuRecEq(lngIdPresu As Long) As Variant
+    Dim sngRecEq As Single, i As Integer, strSQL As String, rs As Recordset
+    On Error GoTo Error_DimePresuRecEq
+    If lngIdPresu = 0 Then
+        DimePresuRecEq = 0
+        GoTo Salir_DimePresuRecEq
+    End If
+    strSQL = "SELECT tbPresuDet.IdPresuCab, tbPresuDet.RecEq"
+    strSQL = strSQL & " FROM tbPresuDet"
+    strSQL = strSQL & " WHERE IdPresuCab = " & lngIdPresu
+    strSQL = strSQL & " GROUP BY tbPresuDet.IdPresuCab, tbPresuDet.RecEq"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then
+        DimePresuRecEq = 0
+        GoTo Salir_DimePresuRecEq
+    End If
+    rs.MoveLast
+    If rs.RecordCount > 1 Then
+        DimePresuRecEq = Null
+    Else
+        DimePresuRecEq = rs("RecEq")
+    End If
+Salir_DimePresuRecEq:
+    Exit Function
+Error_DimePresuRecEq:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimePresuRecEq" & vbCrLf & Err.Description
+            Resume Salir_DimePresuRecEq
+            Resume Next
+    End Select
+End Function
+
+
+
+Public Function AlbaranDesgloseIVA(lngIdAlbaranCab As Long) As String
+    Dim strSQL As String, rs As Recordset, strResult As String
+    strSQL = "SELECT Sum([Cantidad]*[Precio]) AS Importe, tbAlbaranesDet.IVA"
+    strSQL = strSQL & " FROM tbAlbaranesDet"
+    strSQL = strSQL & " GROUP BY tbAlbaranesDet.IdAlbaranCab, tbAlbaranesDet.IVA"
+    strSQL = strSQL & " HAVING tbAlbaranesDet.IdAlbaranCab = " & lngIdAlbaranCab & " And tbAlbaranesDet.IVA <> 0"
+    strSQL = strSQL & " ORDER BY tbAlbaranesDet.IVA;"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    While Not rs.EOF
+        strResult = strResult & Format(rs("IVA"), "0%") & "s. " & Format(rs("Importe"), "#,##0.00") & " + "
+        rs.MoveNext
+    Wend
+    If Len(strResult) > 3 Then strResult = RecDerTop(strResult, 3, 0)
+    AlbaranDesgloseIVA = strResult
+End Function

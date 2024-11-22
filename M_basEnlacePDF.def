@@ -1,0 +1,913 @@
+Option Compare Database
+Option Explicit
+
+Public Sub Añadir_Modif_tMatriculacion(strBastidor As String, Optional intSoloAñadir As Integer = True)
+    On Error GoTo Error_Añadir_Modif_tMatriculacion
+    Dim strSQL As String, rs As Recordset, rstM As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    strSQL = "SELECT Matriculaciones.*, Vehículos.*"
+    strSQL = strSQL & " FROM Matriculaciones LEFT JOIN Vehículos ON Matriculaciones.Bastidor = Vehículos.Bastidor"
+    strSQL = strSQL & " WHERE (((Matriculaciones.Bastidor)=" & ConComillas(strBastidor) & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstM.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
+    If Not rstM.NoMatch Then
+        If intSoloAñadir Then
+            MsgBox "El Nº documento " & rs("Nro Documento") & " ya existe en la tabla TMatriculaciones del programa PDF"
+            Exit Sub
+        Else
+            rstM.Edit
+        End If
+    Else
+        rstM.AddNew
+        rstM("Numero") = NuloEs(DMax("Numero", "tMatriculaciones"), 0) + 1
+        CurrentDb.Execute "UPDATE Matriculaciones SET [Nro Documento] = " & rstM("Numero") & " WHERE Bastidor = " & ConComillas(rs("Matriculaciones.Bastidor")), dbFailOnError
+        'rs.Edit
+        'rs("Nro Documento") = rstM("Numero")
+        'rs.Update
+        'rs.MoveFirst
+    End If
+    rstM("ServicioDestina") = CStr(NuloEs(rs("Servicio al que se destina"), ""))
+    'lngidM = rstM("IdMatriculacion")
+    'rstM ("IdCliente")
+    rstM("Tipo") = "Matriculación" '"040"
+    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = strAux & "040" & Format(Date, "yyyy") & Format(rstM("Numero"), "000000")
+    rstM("NumDocumento") = strAux
+    rstM("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstM("FechExportacion") = 0
+    rstM("FechCreacion") = Now()
+    rstM("FechDevolucion") = 0
+    'rstM("FechPresentacion")
+    'rstM("CausaDevolucion")
+    rstM("Matricula") = ClaveMatricula(NuloEs(rs("Matriculaciones.Matricula"), ""))
+    rstM("Bastidor") = RecDerTop(strBastidor, 0, 21)
+    rstM("FechPresentacion") = rs("Fecha Matriculación")
+    rstM("Jefatura") = "NAVARRA"
+    rstM("Matriculacion") = rs("Fecha Matriculación")
+    rstM("CodigoITV") = rs("CodigoITV")
+    rstM("FechITV") = rs("Fecha Revisión")
+    strCIF = NuloEs(rs("Matriculaciones.CIF Cliente"), "")
+    rstM("DNITit") = RecDerTop(QuitaChar(strCIF, "-"), 0, 9)
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    rstM("Apellido1Tit") = strAp1
+    rstM("Apellido2Tit") = strAp2
+    rstM("NombreTit") = strNom
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección"))
+    If Not rs.NoMatch Then
+        rstM("DomicilioTit") = RecDerTop(rsDir("Dirección"), 0, 26)
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            rstM("MunicipioTit") = rsDir("Población")
+            rstM("ProvinciaTit") = NuloEs(DLookup("Letras", "tProvincias", "idprov = " & CLng(strAux)), "")
+            rstM("CPTit") = strAux & NuloEs(DLookup("CPM", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "")
+        Else
+            rstM("PuebloTit") = rsDir("Población")
+            rstM("ProvinciaTit") = NuloEs(DLookup("Letras", "tProvincias", "nomProv = " & ConComillas(rsDir("Provincia"))), "")
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    rstM("SexoTit") = strAux
+    rstM("NacimientoTit") = DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstM("RepTit") = DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstM("DNIRepTit") = RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9)
+    rstM("ConceptoRepTit") = RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70)
+    rstM("Marca") = RecDerTop(DLookup("[Marca Vehículo]", "Marcas de Vehículos", "[Id Marca Vehículo] = " & NuloEs(rs("[Id Marca Vehículo]"), 0)), 0, 23)
+    rstM("Modelo") = RecDerTop(rs("Modelo"), 0, 22)
+    Select Case rs("Procedencia")
+        Case "FN"
+            rstM("Procedencia") = "0"
+        Case "I"
+            rstM("Procedencia") = "1"
+        Case "S"
+            rstM("Procedencia") = "2"
+        Case "CEE"
+            rstM("Procedencia") = "3"
+    End Select
+    Dim v As Variant
+    v = DLookup("Descripcion", "tbCodificaciones", "TipoCodigo = 7 AND Codigo = " & ConComillas(rstM("Procedencia")))
+'SERVICIO AL QUE SE DESTINA
+    If Not IsNull(v) Then rstM("Procedencia") = rstM("Procedencia") & " - " & v
+    rstM("ServicioDestina") = rs("Servicio al que se destina")
+    v = DLookup("Descripcion", "tbCodificaciones", "TipoCodigo = 8 AND Codigo = " & ConComillas(rstM("ServicioDestina")))
+    If Not IsNull(v) Then rstM("ServicioDestina") = rstM("ServicioDestina") & " - " & v
+'TIPO DE VEHÍCULO
+    rstM("TipoVehiculo") = "40"
+    
+    rstM("Carburante") = IIf(rs("CaracteristicaMotor") = True, "GO - GASOIL", "GA - GASOLINA")
+    rstM("Potencia") = Format(NuloEs(rs("Potencia Fiscal"), 0), "00000")
+    rstM("Cilindrada") = Format(NuloEs(rs("Cilindrada"), 0), "00000")
+    rstM.Update
+Salir_Añadir_Modif_tMatriculacion:
+    Exit Sub
+Error_Añadir_Modif_tMatriculacion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Añadir_Modif_tMatriculacion" & vbCrLf & Err.Description
+            Resume Salir_Añadir_Modif_tMatriculacion
+    End Select
+End Sub
+
+Public Sub Comprobar_tMatriculacion(lngNroDocumento As Long, ByRef intCambio As Integer, ByRef strCambio As String, Optional intMensaje As Integer = False)
+    On Error GoTo Error_Comprobar_tMatriculacion
+    Dim strSQL As String, rs As Recordset, rstM As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    strSQL = "SELECT Matriculaciones.*, Vehículos.*"
+    strSQL = strSQL & " FROM Matriculaciones LEFT JOIN Vehículos ON Matriculaciones.Bastidor = Vehículos.Bastidor"
+    strSQL = strSQL & " WHERE (((Matriculaciones.[Nro Documento])=" & lngNroDocumento & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstM.FindFirst "Numero = " & lngNroDocumento
+    If rstM.NoMatch Then
+        If intMensaje Then
+            MsgBox "El Nº documento " & lngNroDocumento & " no existe en la tabla de tMatriculaciones"
+        End If
+        Exit Sub
+    End If
+    If rstM("Bastidor") = rs("Matriculaciones.Bastidor") Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Bastidor: de..." & rstM("Bastidor") & " a " & rs("Bastidor") & vbCrLf
+    End If
+    If rstM("ServicioDestina") = CStr(NuloEs(rs("Servicio al que se destina"), "")) Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Servicio: de..." & rstM("ServicioDestina") & " a " & rs("Servicio al que se destina") & vbCrLf
+    End If
+        
+    If rstM("Matricula") = ClaveMatricula(NuloEs(rs("Matriculaciones.Matricula"), "")) Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Matricula: de..." & rstM("Matricula") & " a " & ClaveMatricula(rs("Matriculaciones.Matricula")) & vbCrLf
+    End If
+     'falta esto rstM("Bastidor") = RecDerTop(frm.Bastidor, 0, 21)
+    'rstM("FechaPresentacion") = Date
+    'rstM("Jefatura") = "NA"
+    If rstM("Matriculacion") = rs("Fecha Matriculación") Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Fecha Matriculación: de..." & rstM("Matriculacion") & " a " & rs("Fecha Matriculación") & vbCrLf
+    End If
+    If rstM("FechITV") = rs("Fecha Revisión") Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Fecha ITV: de..." & rstM("FechITV") & " a " & rs("Fecha Revisión") & vbCrLf
+    End If
+    If rstM("CodigoITV") = rs("CodigoITV") Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Código ITV: de..." & rstM("CodigoITV") & " a " & rs("CodigoITV") & vbCrLf
+    End If
+    strCIF = NuloEs(rs("Matriculaciones.CIF Cliente"), "")
+    If rstM("DNITit") = RecDerTop(QuitaChar(strCIF, "-"), 0, 9) Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "DNI Titular: de..." & rstM("DNITit") & " a " & RecDerTop(QuitaChar(rs("Matriculaciones.CIF Cliente"), "-"), 0, 9) & vbCrLf
+    End If
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    If rstM("Apellido1Tit") = strAp1 Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Apellido 1 Titular: de..." & rstM("Apellido1Tit") & " a " & strAp1 & vbCrLf
+    End If
+    If rstM("Apellido2Tit") = strAp2 Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Apellido 2 Titular: de..." & rstM("Apellido2Tit") & " a " & strAp2 & vbCrLf
+    End If
+    If rstM("NombreTit") = strNom Then
+    Else
+        intCambio = True
+        strCambio = strCambio & "Nombre Titular: de..." & rstM("NombreTit") & " a " & strNom & vbCrLf
+    End If
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección"))
+    If Not rs.NoMatch Then
+        If rstM("DomicilioTit") <> RecDerTop(rsDir("Dirección"), 0, 26) Then
+            intCambio = True
+            strCambio = strCambio & "Domicilio Titular: de..." & rstM("DomicilioTit") & " a " & RecDerTop(rsDir("Dirección"), 0, 26) & vbCrLf
+        End If
+        
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            If rstM("MunicipioTit") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Municipio Titular: de..." & rstM("MunicipioTit") & " a " & rsDir("Población") & vbCrLf
+            End If
+            If rstM("ProvinciaTit") <> NuloEs(DLookup("Letras", "tProvincias", "idprov = " & CLng(strAux)), "") Then
+                intCambio = True
+                strCambio = strCambio & "Provincia Titular: de..." & rstM("ProvinciaTit") & " a " & NuloEs(DLookup("Letras", "tProvincias", "idprov = " & CLng(strAux)), "") & vbCrLf
+            End If
+            If rstM("CPTit") <> strAux & NuloEs(DLookup("CPM", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "") Then
+                intCambio = True
+                strCambio = strCambio & "Cód. Postal Titular: de..." & rstM("CPTit") & " a " & strAux & NuloEs(DLookup("CPM", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "") & vbCrLf
+            End If
+        Else
+            If rstM("PuebloTit") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Pueblo Titular: de..." & rstM("PuebloTit") & " a " & rsDir("Población") & vbCrLf
+            End If
+            If rstM("ProvinciaTit") <> NuloEs(DLookup("Letras", "tProvincias", "nomProv = " & ConComillas(rsDir("Provincia"))), "") Then
+                intCambio = True
+                strCambio = strCambio & "Provincia Titular: de..." & rstM("ProvinciaTit") & " a " & NuloEs(DLookup("Letras", "tProvincias", "nomProv = " & ConComillas(rsDir("Provincia"))), "") & vbCrLf
+            End If
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    If rstM("SexoTit") <> strAux Then
+        intCambio = True
+        strCambio = strCambio & "Sexo Titular: de..." & rstM("SexoTit") & " a " & strAux & vbCrLf
+    End If
+    If rstM("NacimientoTit") <> DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "F. Nacimiento Titular: de..." & rstM("NacimientoTit") & " a " & DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstM("RepTit") <> DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "Representante Titular: de..." & rstM("RepTit") & " a " & DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstM("DNIRepTit") <> RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Representante Titular: de..." & rstM("DNIRepTit") & " a " & RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) & vbCrLf
+    End If
+    If rstM("ConceptoRepTit") <> RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) Then
+        intCambio = True
+        strCambio = strCambio & "Concepto Representante Titular: de..." & rstM("ConceptoRepTit") & " a " & RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) & vbCrLf
+    End If
+    If rstM("Marca") <> RecDerTop(DLookup("[Marca Vehículo]", "Marcas de Vehículos", "[Id Marca Vehículo] = " & NuloEs(rs("[Id Marca Vehículo]"), 0)), 0, 23) Then
+        intCambio = True
+        strCambio = strCambio & "Marca Vehículo: de..." & rstM("Marca") & " a " & RecDerTop(DLookup("[Marca Vehículo]", "Marcas de Vehículos", "[Id Marca Vehículo] = " & NuloEs(rs("[Id Marca Vehículo]"), 0)), 0, 23) & vbCrLf
+    End If
+    If rstM("Modelo") <> RecDerTop(rs("Modelo"), 0, 22) Then
+        intCambio = True
+        strCambio = strCambio & "Modelo Vehículo: de..." & rstM("Modelo") & " a " & RecDerTop(rs("Modelo"), 0, 22) & vbCrLf
+    End If
+    Select Case rs("Procedencia")
+        Case "FN"
+            strAux = "0"
+        Case "I"
+            strAux = "1"
+        Case "S"
+            strAux = "2"
+        Case "CEE"
+            strAux = "3"
+        Case Else
+            strAux = " "
+    End Select
+    If rstM("Procedencia") <> strAux Then
+        intCambio = True
+        strCambio = strCambio & "Procedencia Veh.: de..." & rstM("Procedencia") & " a " & strAux & vbCrLf
+    End If
+    If rstM("Carburante") <> IIf(rs("CaracteristicaMotor") = True, "GO", "GA") Then
+        intCambio = True
+        strCambio = strCambio & "Carburante: de..." & rstM("Carburante") & " a " & IIf(rs("CaracteristicaMotor") = True, "GO", "GA") & vbCrLf
+    End If
+    If rstM("Potencia") <> Format(NuloEs(rs("Potencia Fiscal"), 0), "000.00") Then
+        intCambio = True
+        strCambio = strCambio & "Potencia: de..." & rstM("Potencia") & " a " & Format(NuloEs(rs("Potencia Fiscal"), 0), "000.00") & vbCrLf
+    End If
+    If rstM("Cilindrada") <> Format(NuloEs(rs("Cilindrada"), 0), "00000") Then
+        intCambio = True
+        strCambio = strCambio & "Cilindrada: de..." & rstM("Cilindrada") & " a " & Format(NuloEs(rs("Cilindrada"), 0), "00000") & vbCrLf
+    End If
+    'rstM.Update
+Salir_Comprobar_tMatriculacion:
+    Exit Sub
+Error_Comprobar_tMatriculacion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Comprobar_tMatriculacion" & vbCrLf & Err.Description
+            Resume Salir_Comprobar_tMatriculacion
+    End Select
+End Sub
+
+Public Sub Añadir_Modif_tTransmision(lngNroRegistro As Long, Optional intSoloAñadir As Integer = True)
+    On Error GoTo Error_Añadir_Modif_tTransmision
+    Dim strSQL As String, rs As Recordset, rstT As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    strSQL = "SELECT Transferencias.*, Vehículos.*"
+    strSQL = strSQL & " FROM Transferencias LEFT JOIN Vehículos ON Transferencias.Matricula = Vehículos.Matricula"
+    strSQL = strSQL & " WHERE (((Transferencias.NroRegistro)=" & lngNroRegistro & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstT.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
+    If Not rstT.NoMatch Then
+        If intSoloAñadir Then
+            MsgBox "El documento Nº " & rs("Nro Documento") & " ya existe en la tabla tTransmisiones del programa PDF"
+            Exit Sub
+        Else
+            rstT.Edit
+        End If
+    Else
+        'if rs("Nro Documento") no es nulo ??? de momento ná
+        rstT.AddNew
+        rstT("Numero") = NuloEs(DMax("Numero", "tTransmisiones"), 0) + 1
+        CurrentDb.Execute "UPDATE Transferencias SET [Nro Documento] = " & rstT("Numero") & " WHERE NroRegistro = " & rs("NroRegistro"), dbFailOnError
+'        rs.Edit
+'        rs("NroDocumento") = rstT("Numero")
+'        rs.Update
+'        rs.MoveFirst
+    End If
+    'rstT ("ModoAdjudicacion")
+    rstT("ServicioDestina") = CStr(NuloEs(rs("Servicio al que se destina"), ""))
+    'lngidM = rstT("IdTransmision")
+    'rstT ("IdCliente")
+    rstT("Tipo") = "Transmisión" '"030"
+    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = strAux & "030" & Format(Date, "yyyy") & Format(rstT("Numero"), "000000")
+    rstT("NumDocumento") = strAux
+    rstT("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstT("FechExportacion") = 0
+    rstT("FechCreacion") = Now()
+    'rstT("FechLimitacion") = Null 'Now()
+    rstT("FechDevolucion") = 0
+    rstT("FechPresentacion") = Now()
+    'rstT("CausaDevolucion")
+    rstT("Matricula") = ClaveMatricula(NuloEs(rs("Transferencias.Matricula"), ""))
+    rstT("Matriculacion") = rs("Fecha Matriculación")
+    rstT("Jefatura") = "NAVARRA"
+    rstT("FechITV") = rs("Fecha Revisión")
+    strCIF = NuloEs(rs("CIF Transmitente"), "")
+    rstT("DNITrans") = RecDerTop(QuitaChar(strCIF, "-"), 0, 9)
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    rstT("Apellido1Trans") = strAp1
+    rstT("Apellido2Trans") = strAp2
+    rstT("NombreTrans") = strNom
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección Trans"))
+    If Not rs.NoMatch Then
+        rstT("ProvinciaTrans") = rsDir("Provincia")
+        rstT("DomicilioTrans") = RecDerTop(rsDir("Dirección"), 0, 26)
+        rstT("CPTrans") = rsDir("Código Postal")
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            rstT("MunicipioTrans") = rsDir("Población")
+        Else
+            rstT("PuebloTrans") = rsDir("Población")
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    rstT("SexoTrans") = strAux
+    rstT("RepTrans") = DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstT("DNIRepTrans") = RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9)
+    rstT("ConceptoRepTrans") = RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70)
+    strCIF = NuloEs(rs("CIF Adquirente"), "")
+    rstT("DNIAdq") = RecDerTop(QuitaChar(strCIF, "-"), 0, 9)
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    rstT("Apellido1Adq") = strAp1
+    rstT("Apellido2Adq") = strAp2
+    rstT("NombreAdq") = strNom
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección"))
+    If Not rs.NoMatch Then
+        rstT("ProvinciaAdq") = rsDir("Provincia")
+        rstT("DomicilioAdq") = RecDerTop(rsDir("Dirección"), 0, 26)
+        rstT("CPAdq") = rsDir("Código Postal")
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            rstT("MunicipioAdq") = rsDir("Población")
+        Else
+            rstT("PuebloAdq") = rsDir("Población")
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    rstT("SexoAdq") = strAux
+    rstT("NacimientoAdq") = DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstT("RepAdq") = DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstT("DNIRepAdq") = RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9)
+    rstT("ConceptoRepAdq") = RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70)
+    rstT.Update
+Salir_Añadir_Modif_tTransmision:
+    Exit Sub
+Error_Añadir_Modif_tTransmision:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Añadir_Modif_tTransmision" & vbCrLf & Err.Description
+            Resume Salir_Añadir_Modif_tTransmision
+    End Select
+End Sub
+
+
+Public Sub Comprobar_tTransmision(lngNroDocumento As Long, ByRef intCambio As Integer, ByRef strCambio As String, Optional intMensaje As Integer = False)
+    On Error GoTo Error_Comprobar_tTransmision
+    Dim strSQL As String, rs As Recordset, rstT As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    strSQL = "SELECT Transferencias.*, Vehículos.*"
+    strSQL = strSQL & " FROM Transferencias LEFT JOIN Vehículos ON Transferencias.Matricula = Vehículos.Matricula"
+    strSQL = strSQL & " WHERE (((Transferencias.[Nro Documento])=" & lngNroDocumento & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstT.FindFirst "Numero = " & lngNroDocumento
+    If rstT.NoMatch Then
+        If intMensaje Then
+            MsgBox "El Nº documento " & lngNroDocumento & " no existe en la tabla de tTransmisiones"
+        End If
+        Exit Sub
+    End If
+    If rstT("ServicioDestina") <> CStr(NuloEs(rs("Servicio al que se destina"), "")) Then
+        intCambio = True
+        strCambio = strCambio & "Servicio: de..." & rstT("ServicioDestina") & " a " & rs("Servicio al que se destina") & vbCrLf
+    End If
+        
+    If rstT("Matricula") <> ClaveMatricula(NuloEs(rs("Transferencias.Matricula"), "")) Then
+        intCambio = True
+        strCambio = strCambio & "Matricula: de..." & rstT("Matricula") & " a " & ClaveMatricula(rs("Transferencias.Matricula")) & vbCrLf
+    End If
+     'falta esto rstT("Bastidor") = RecDerTop(frm.Bastidor, 0, 21)
+    'rstT("FechaPresentacion") = Date
+    'rstT("Jefatura") = "NA"
+    If rstT("Matriculacion") <> rs("Fecha Matriculación") Then
+        intCambio = True
+        strCambio = strCambio & "Fecha Matriculación: de..." & rstT("Matriculacion") & " a " & rs("Fecha Matriculación") & vbCrLf
+    End If
+    If rstT("FechITV") <> rs("Fecha Revisión") Then
+        intCambio = True
+        strCambio = strCambio & "Fecha ITV: de..." & rstT("FechITV") & " a " & rs("Fecha Revisión") & vbCrLf
+    End If
+    strCIF = NuloEs(rs("CIF Transmitente"), "")
+    If rstT("DNITrans") <> RecDerTop(QuitaChar(strCIF, "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Transfirente: de..." & rstT("DNITrans") & " a " & RecDerTop(QuitaChar(strCIF, "-"), 0, 9) & vbCrLf
+    End If
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    If rstT("Apellido1Trans") <> strAp1 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 1 Transfirente: de..." & rstT("Apellido1Trans") & " a " & strAp1 & vbCrLf
+    End If
+    If rstT("Apellido2Trans") <> strAp2 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 2 Transfirente: de..." & rstT("Apellido2Trans") & " a " & strAp2 & vbCrLf
+    End If
+    If rstT("NombreTrans") <> strNom Then
+        intCambio = True
+        strCambio = strCambio & "Nombre Transfirente: de..." & rstT("NombreTrans") & " a " & strNom & vbCrLf
+    End If
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección"))
+    If Not rs.NoMatch Then
+        If rstT("ProvinciaTrans") <> rsDir("Provincia") Then
+            intCambio = True
+            strCambio = strCambio & "Provincia Transfirente: de..." & rstT("ProvinciaTrans") & " a " & rsDir("Provincia") & vbCrLf
+        End If
+        If rstT("DomicilioTrans") <> RecDerTop(rsDir("Dirección"), 0, 26) Then
+            intCambio = True
+            strCambio = strCambio & "Domicilio Transfirente: de..." & rstT("DomicilioTrans") & " a " & RecDerTop(rsDir("Dirección"), 0, 26) & vbCrLf
+        End If
+        If rstT("CPTrans") <> rsDir("Código Postal") Then
+            intCambio = True
+            strCambio = strCambio & "Cód. Postal Transfirente: de..." & rstT("CPTrans") & " a " & rsDir("Código Postal") & vbCrLf
+        End If
+        
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            If rstT("MunicipioTrans") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Municipio Transfirente: de..." & rstT("MunicipioTrans") & " a " & rsDir("Población") & vbCrLf
+            End If
+        Else
+            If rstT("PuebloTrans") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Pueblo Transfirente: de..." & rstT("PuebloTrans") & " a " & rsDir("Población") & vbCrLf
+            End If
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    If rstT("SexoTrans") <> strAux Then
+        intCambio = True
+        strCambio = strCambio & "Sexo Transfirente: de..." & rstT("SexoTrans") & " a " & strAux & vbCrLf
+    End If
+    If rstT("RepTrans") <> DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "Representante Transfirente: de..." & rstT("RepTrans") & " a " & DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstT("DNIRepTrans") <> RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Representante Transfirente: de..." & rstT("DNIRepTrans") & " a " & RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) & vbCrLf
+    End If
+    If rstT("ConceptoRepTrans") <> RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) Then
+        intCambio = True
+        strCambio = strCambio & "Concepto Representante Transfirente: de..." & rstT("ConceptoRepTrans") & " a " & RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) & vbCrLf
+    End If
+'Adquirente----------------------------------------------    ----------------------------------------------
+    strCIF = NuloEs(rs("CIF Adquirente"), "")
+    If rstT("DNIAdq") <> RecDerTop(QuitaChar(strCIF, "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Adquirente: de..." & rstT("DNIAdq") & " a " & RecDerTop(QuitaChar(strCIF, "-"), 0, 9) & vbCrLf
+    End If
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    If rstT("Apellido1Adq") <> strAp1 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 1 Adquirente: de..." & rstT("Apellido1Adq") & " a " & strAp1 & vbCrLf
+    End If
+    If rstT("Apellido2Adq") <> strAp2 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 2 Adquirente: de..." & rstT("Apellido2Adq") & " a " & strAp2 & vbCrLf
+    End If
+    If rstT("NombreAdq") <> strNom Then
+        intCambio = True
+        strCambio = strCambio & "Nombre Adquirente: de..." & rstT("NombreAdq") & " a " & strNom & vbCrLf
+    End If
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro de Dirección"))
+    If Not rs.NoMatch Then
+        If rstT("ProvinciaAdq") <> rsDir("Provincia") Then
+            intCambio = True
+            strCambio = strCambio & "Provincia Adquirente: de..." & rstT("ProvinciaAdq") & " a " & rsDir("Provincia") & vbCrLf
+        End If
+        If rstT("DomicilioAdq") <> RecDerTop(rsDir("Dirección"), 0, 26) Then
+            intCambio = True
+            strCambio = strCambio & "Domicilio Adquirente: de..." & rstT("DomicilioAdq") & " a " & RecDerTop(rsDir("Dirección"), 0, 26) & vbCrLf
+        End If
+        If rstT("CPAdq") <> rsDir("Código Postal") Then
+            intCambio = True
+            strCambio = strCambio & "Cód. Postal Adquirente: de..." & rstT("CPTrans") & " a " & rsDir("Código Postal") & vbCrLf
+        End If
+        
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            If rstT("MunicipioAdq") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Municipio Adquirente: de..." & rstT("MunicipioAdq") & " a " & rsDir("Población") & vbCrLf
+            End If
+        Else
+            If rstT("PuebloAdq") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Pueblo Adquirente: de..." & rstT("PuebloAdq") & " a " & rsDir("Población") & vbCrLf
+            End If
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    If rstT("SexoAdq") <> strAux Then
+        intCambio = True
+        strCambio = strCambio & "Sexo Adquirente: de..." & rstT("SexoAdq") & " a " & strAux & vbCrLf
+    End If
+    If rstT("NacimientoAdq") <> DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "F. Nacimiento Adquirente: de..." & rstT("NacimientoAdq") & " a " & DLookup("[Fecha Nacimiento]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstT("RepAdq") <> DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "Representante Adquirente: de..." & rstT("RepAdq") & " a " & DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstT("DNIRepAdq") <> RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Representante Adquirente: de..." & rstT("DNIRepAdq") & " a " & RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) & vbCrLf
+    End If
+    If rstT("ConceptoRepAdq") <> RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) Then
+        intCambio = True
+        strCambio = strCambio & "Concepto Representante Adquirente: de..." & rstT("ConceptoRepAdq") & " a " & RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) & vbCrLf
+    End If
+    Select Case rs("Procedencia")
+        Case "FN"
+            strAux = "0"
+        Case "I"
+            strAux = "1"
+        Case "S"
+            strAux = "2"
+        Case "CEE"
+            strAux = "3"
+        Case Else
+            strAux = " "
+    End Select
+    If rstT("Procedencia") <> strAux Then
+        intCambio = True
+        strCambio = strCambio & "Procedencia Veh.: de..." & rstT("Procedencia") & " a " & strAux & vbCrLf
+    End If
+Salir_Comprobar_tTransmision:
+    Exit Sub
+Error_Comprobar_tTransmision:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Comprobar_tTransmision" & vbCrLf & Err.Description
+            Resume Salir_Comprobar_tTransmision
+    End Select
+End Sub
+
+Public Sub Añadir_Modif_tBaja(lngIdBajaV As Long, Optional intSoloAñadir As Integer = True)
+    On Error GoTo Error_Añadir_Modif_tBaja
+    Dim strSQL As String, rs As Recordset, rstB As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    strSQL = "SELECT [Baja de Vehículos].*, Vehículos.*, [Baja de Vehículos].Matricula as Mat"
+    strSQL = strSQL & " FROM [Baja de Vehículos] LEFT JOIN Vehículos ON [Baja de Vehículos].Matricula = Vehículos.Matricula"
+    strSQL = strSQL & " WHERE ((([Baja de Vehículos].[IdBajaV])=" & lngIdBajaV & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstB.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
+    If Not rstB.NoMatch Then
+        If intSoloAñadir Then
+            MsgBox "El documento Nº " & rs("Nro Documento") & " ya existe en la tabla tBajas del programa PDF"
+            Exit Sub
+        Else
+            rstB.Edit
+        End If
+    Else
+        'if rs("Nro Documento") no es nulo ??? de momento ná
+        rstB.AddNew
+        rstB("Numero") = NuloEs(DMax("Numero", "tBajas"), 0) + 1
+        CurrentDb.Execute "UPDATE [Baja de Vehículos] SET [Nro Documento] = " & rstB("Numero") & " WHERE IdBajaV = " & lngIdBajaV, dbFailOnError
+'        rs.Edit
+'        rs("NroDocumento") = rstB("Numero")
+'        rs.Update
+'        rs.MoveFirst
+    End If
+    'rstB ("ModoAdjudicacion")
+    'lngidM = rstB("IdTransmision")
+    'rstB ("IdCliente")
+    rstB("Tipo") = "Baja" '"020"
+    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = strAux & "020" & Format(Date, "yyyy") & Format(rstB("Numero"), "000000")
+    rstB("NumDocumento") = strAux
+    rstB("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstB("FechExportacion") = 0
+    rstB("FechCreacion") = Now()
+    rstB("FechDevolucion") = 0
+    rstB("FechPresentacion") = Date
+    'rstB("CausaDevolucion")
+    rstB("Matricula") = ClaveMatricula(NuloEs(rs("Mat"), ""))
+    rstB("Matriculacion") = rs("Fecha Matriculación")
+    rstB("Jefatura") = "NAVARRA"
+
+'Motivos de Baja 3   Temporal finalizado contrato de arrend.
+'Motivos de Baja 4   Temporal transferencia
+'Motivos de Baja 7   Definitiva exportacion
+    Select Case rs("[Motivo Baja]") '"";0;;
+        Case 1 '"Sustracción - Baja Temporal";1;
+            rstB("TipoBaja") = 2 'Temporal sustraccion
+        Case 2 '"Ausencia - Baja Temporal";2;
+            rstB("TipoBaja") = 1 'Temporal voluntaria
+        Case 3 '"Otras Causas - Baja Temporal";3;
+            rstB("TipoBaja") = 4 ' Transferencia
+        Case 4 '"Desguace - Baja Definitiva";4;
+            rstB("TipoBaja") = 5 'Definitiva voluntaria
+        Case 5, 6, 7 '"Agotamiento - Baja Definitiva";5;"Antigüedad - Baja Definitiva";6;"Renovación Parque - Baja Definitiva";7
+            rstB("TipoBaja") = 6 'Definitiva renovacion parque
+        Case 8 '"Otras Causas - Baja Definitiva";8
+            rstB("TipoBaja") = 8 '8   Definitiva transito comunitario
+    End Select
+    rstB("ConceptoActua") = "0 - TITULAR"
+    strCIF = NuloEs(rs("CIF Cliente"), "")
+    rstB("DNITrans") = RecDerTop(QuitaChar(strCIF, "-"), 0, 9)
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    rstB("Apellido1Trans") = strAp1
+    rstB("Apellido2Trans") = strAp2
+    rstB("NombreTrans") = strNom
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro Dirección"))
+    If Not rs.NoMatch Then
+        rstB("ProvinciaTrans") = rsDir("Provincia")
+        rstB("DomicilioTrans") = RecDerTop(rsDir("Dirección"), 0, 26)
+        rstB("CPTrans") = rsDir("Código Postal")
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            rstB("MunicipioTrans") = rsDir("Población")
+        Else
+            rstB("PuebloTrans") = rsDir("Población")
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    rstB("RepTrans") = DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF))
+    rstB("DNIRepTrans") = RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9)
+    rstB("ConceptoRepTrans") = RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70)
+    rstB.Update
+Salir_Añadir_Modif_tBaja:
+    Exit Sub
+Error_Añadir_Modif_tBaja:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Añadir_Modif_tBaja" & vbCrLf & Err.Description
+            Resume Salir_Añadir_Modif_tBaja
+    End Select
+End Sub
+
+Public Sub Comprobar_tBaja(lngNroDocumento As Long, ByRef intCambio As Integer, ByRef strCambio As String, Optional intMensaje As Integer = False)
+    On Error GoTo Error_Comprobar_tBaja
+    Dim strSQL As String, rs As Recordset, rstB As Recordset, intExiste As Integer, rsDir As Recordset
+    Dim strCIF As String, strAux As String, strAux2 As String, strAp1 As String, strAp2 As String, strNom As String
+    Dim intMotivo As Integer
+    strSQL = "SELECT [Baja de Vehículos].*, Vehículos.*, [Baja de Vehículos].Matricula as Mat"
+    strSQL = strSQL & " FROM [Baja de Vehículos] LEFT JOIN Vehículos ON [Baja de Vehículos].Matricula = Vehículos.Matricula"
+    strSQL = strSQL & " WHERE ((([Baja de Vehículos].[Nro Documento])=" & lngNroDocumento & "))"
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rs.EOF Then Exit Sub
+    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset)
+    Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
+    rs.MoveFirst
+    rstB.FindFirst "Numero = " & lngNroDocumento
+    If rstB.NoMatch Then
+        If intMensaje Then
+            MsgBox "El Nº documento " & lngNroDocumento & " no existe en la tabla de tBajas"
+        End If
+        Exit Sub
+    End If
+    If rstB("Matricula") <> ClaveMatricula(NuloEs(rs("Mat"), "")) Then
+        intCambio = True
+        strCambio = strCambio & "Matricula: de..." & rstB("Matricula") & " a " & ClaveMatricula(rs("Mat")) & vbCrLf
+    End If
+     'falta esto rstB("Bastidor") = RecDerTop(frm.Bastidor, 0, 21)
+    'rstB("FechaPresentacion") = Date
+    'rstB("Jefatura") = "NA"
+    If rstB("Matriculacion") <> rs("Fecha Matriculación") Then
+        intCambio = True
+        strCambio = strCambio & "Fecha Matriculación: de..." & rstB("Matriculacion") & " a " & rs("Fecha Matriculación") & vbCrLf
+    End If
+    strCIF = NuloEs(rs("CIF Cliente"), "")
+    If rstB("DNITrans") <> RecDerTop(QuitaChar(strCIF, "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Solicitante: de..." & rstB("DNITrans") & " a " & RecDerTop(QuitaChar(strCIF, "-"), 0, 9) & vbCrLf
+    End If
+    strAux = NuloEs(DLookup("Nombre", "Clientes", "CIF = " & ConComillas(strCIF)), "")
+    NombreCliente strAux, strAp1, strAp2, strNom
+    If rstB("Apellido1Trans") <> strAp1 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 1 Solicitante: de..." & rstB("Apellido1Trans") & " a " & strAp1 & vbCrLf
+    End If
+    If rstB("Apellido2Trans") <> strAp2 Then
+        intCambio = True
+        strCambio = strCambio & "Apellido 2 Solicitante: de..." & rstB("Apellido2Trans") & " a " & strAp2 & vbCrLf
+    End If
+    If rstB("NombreTrans") <> strNom Then
+        intCambio = True
+        strCambio = strCambio & "Nombre Solicitante: de..." & rstB("NombreTrans") & " a " & strNom & vbCrLf
+    End If
+    rsDir.FindFirst "CIF = " & ConComillas(strCIF) & " AND [Nro de Dirección] = " & ConComillas(rs("Nro Dirección"))
+    If Not rs.NoMatch Then
+        If rstB("ProvinciaTrans") <> rsDir("Provincia") Then
+            intCambio = True
+            strCambio = strCambio & "Provincia Solicitante: de..." & rstB("ProvinciaTrans") & " a " & rsDir("Provincia") & vbCrLf
+        End If
+        If rstB("DomicilioTrans") <> RecDerTop(rsDir("Dirección"), 0, 26) Then
+            intCambio = True
+            strCambio = strCambio & "Domicilio Solicitante: de..." & rstB("DomicilioTrans") & " a " & RecDerTop(rsDir("Dirección"), 0, 26) & vbCrLf
+        End If
+        If rstB("CPTrans") <> rsDir("Código Postal") Then
+            intCambio = True
+            strCambio = strCambio & "Cód. Postal Solicitante: de..." & rstB("CPTrans") & " a " & rsDir("Código Postal") & vbCrLf
+        End If
+        
+        strAux = NuloEs(DLookup("CP", "tMunicipios", "Municipio = " & ConComillas(rsDir("Población"))), "0")
+        strAux2 = NuloEs(DLookup("nomProv", "tProvincias", "idprov = " & CLng(strAux)), "")
+        If strAux2 = rsDir("Provincia") Then
+            If rstB("MunicipioTrans") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Municipio Solicitante: de..." & rstB("MunicipioTrans") & " a " & rsDir("Población") & vbCrLf
+            End If
+        Else
+            If rstB("PuebloTrans") <> rsDir("Población") Then
+                intCambio = True
+                strCambio = strCambio & "Pueblo Solicitante: de..." & rstB("PuebloTrans") & " a " & rsDir("Población") & vbCrLf
+            End If
+        End If
+    End If
+    strAux = NuloEs(DLookup("Sexo", "Clientes", "CIF = " & ConComillas(strCIF)), "X")
+    Select Case strAux
+        Case "M"
+            strAux = "H"
+    End Select
+    If rstB("RepTrans") <> DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) Then
+        intCambio = True
+        strCambio = strCambio & "Representante Solicitante: de..." & rstB("RepTrans") & " a " & DLookup("[Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)) & vbCrLf
+    End If
+    If rstB("DNIRepTrans") <> RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) Then
+        intCambio = True
+        strCambio = strCambio & "DNI Representante Solicitante: de..." & rstB("DNIRepTrans") & " a " & RecDerTop(QuitaChar(DLookup("[DNI Persona Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), "-"), 0, 9) & vbCrLf
+    End If
+    If rstB("ConceptoRepTrans") <> RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) Then
+        intCambio = True
+        strCambio = strCambio & "Concepto Representante Solicitante: de..." & rstB("ConceptoRepTrans") & " a " & RecDerTop(DLookup("[Concepto Representa Titular]", "Clientes", "CIF = " & ConComillas(strCIF)), 0, 70) & vbCrLf
+    End If
+    Select Case rs("[Motivo Baja]") '"";0;;
+        Case 1 '"Sustracción - Baja Temporal";1;
+            intMotivo = 2
+            strAux = "2 (Temporal sustraccion)"
+        Case 2 '"Ausencia - Baja Temporal";2;
+            intMotivo = 1
+            strAux = "1 (Temporal voluntaria)"
+        Case 3 '"Otras Causas - Baja Temporal";3;
+            intMotivo = 4
+            strAux = "4 (Transferencia)"
+        Case 4 '"Desguace - Baja Definitiva";4;
+            intMotivo = 5
+            strAux = "5 (Definitiva voluntaria)"
+        Case 5, 6, 7 '"Agotamiento - Baja Definitiva";5;"Antigüedad - Baja Definitiva";6;"Renovación Parque - Baja Definitiva";7
+            intMotivo = 6
+            strAux = "6 (Definitiva renovacion parque)"
+        Case 8 '"Otras Causas - Baja Definitiva";8
+            intMotivo = 8
+            strAux = "8 (Definitiva transito comunitario)"
+    End Select
+    If rstB("TipoBaja") <> intMotivo Then
+        intCambio = True
+        strCambio = strCambio & "Motivo de Baja: de..." & rstB("TipoBaja") & " a " & strAux & vbCrLf
+    End If
+    
+Salir_Comprobar_tBaja:
+    Exit Sub
+Error_Comprobar_tBaja:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Comprobar_tBaja" & vbCrLf & Err.Description
+            Resume Salir_Comprobar_tBaja
+    End Select
+End Sub
+
+
+Public Function ClaveMatricula(strMatricula As String) As String
+    On Error GoTo Error_ClaveMatricula
+    Dim i As Integer, strClave As String
+    For i = 1 To Len(strMatricula)
+        If Mid(strMatricula, i, 1) <> "-" Then
+            strClave = strClave & UCase(Mid(strMatricula, i, 1))
+        End If
+    Next i
+    If Right(strClave, 2) = "VE" Then
+        strClave = Left(strClave, Len(strClave) - 2) & Right(strClave, 1)
+    End If
+    If IsNumeric(Right(strClave, 1)) And Not IsNumeric(Right(strClave, 6)) Then
+        strClave = Left(strClave, Len(strClave) - 5) & "0" & Right(strClave, 5)
+    End If
+    strClave = NuloEs(RecDerTop(strClave, 0, 9), "")
+Salir_ClaveMatricula:
+    ClaveMatricula = strClave
+    Exit Function
+Error_ClaveMatricula:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en ClaveMatricula" & vbCrLf & Err.Description
+            Resume Salir_ClaveMatricula
+    End Select
+End Function
+
+
+Public Function IsOpenForm(strForm As String) As Integer
+    Dim frm As Form
+    On Error GoTo Error_IsOpenForm
+    IsOpenForm = False
+    For Each frm In Application.Forms
+        If frm.Name = strForm Then
+            IsOpenForm = True
+            Exit For
+        End If
+    Next frm
+Salir_IsOpenForm:
+    Exit Function
+Error_IsOpenForm:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & vbCrLf & Err.Description & vbCrLf & "En IsOpenForm"
+    End Select
+    Resume Salir_IsOpenForm
+End Function

@@ -1,0 +1,43 @@
+Option Compare Database
+Option Explicit
+
+
+Function CompruebaDC(strCuenta As String, intRes As Integer) As String
+    If Len(strCuenta) = 20 Then
+        strCuenta = Mid(strCuenta, 1, 4) & "-" & Mid(strCuenta, 5, 4) & "-" & Mid(strCuenta, 9, 2) & "-" & Mid(strCuenta, 11)
+    End If
+    intRes = True
+    If Mid(strCuenta, 11, 1) = " " Then
+        Mid(strCuenta, 11, 1) = dcbank2(Mid(strCuenta, 1, 4) & Mid(strCuenta, 6, 4))
+    Else
+        If Mid(strCuenta, 11, 1) <> CStr(dcbank2(Mid(strCuenta, 1, 4) & Mid(strCuenta, 6, 4))) Then
+            MsgBox "Detectado error en el primer Dígito de Control"
+            intRes = False
+        End If
+    End If
+    If Mid(strCuenta, 12, 1) = " " Then
+        Mid(strCuenta, 12, 1) = dcbank2(Mid(strCuenta, 14))
+    Else
+        If Mid(strCuenta, 12, 1) <> CStr(dcbank2(Mid(strCuenta, 14))) Then
+            MsgBox "Detectado error en el segundo Dígito de Control"
+            intRes = False
+        End If
+    End If
+    CompruebaDC = strCuenta
+End Function
+
+Function dcbank2(Serie)
+    Const PESOS = "06030709100508040201"
+    Dim l As Long, i As Integer, s As String
+    For i = 1 To Len(Serie)
+        l = l + (Mid(Serie, Len(Serie) - i + 1, 1) * Mid(PESOS, ((i - 1) * 2) + 1, 2))
+    Next
+    Select Case 11 - (l Mod 11)
+        Case 11
+            dcbank2 = 0
+        Case 10
+            dcbank2 = 1
+        Case Else
+            dcbank2 = 11 - (l Mod 11)
+    End Select
+End Function

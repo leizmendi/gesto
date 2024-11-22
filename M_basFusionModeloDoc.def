@@ -1,0 +1,194 @@
+Option Compare Database
+Option Explicit
+
+Dim mobjWord As New Word.Application
+Dim mobjExcel As New Excel.Application
+Const adhcWordClass = "Word.application"
+Const adhcExcelClass = "Excel.application"
+Dim mdocWord As Word.Document
+Dim mxlsExcel As Excel.Workbook
+Dim mObj As Object
+Dim oWord As New Word.Application
+Dim docW As Word.Document
+
+Public Function FusionDocModelo(strDocMod As String, strDocDestino As String, strDataSourceName As String, Optional strDataSourceConnection As String = "Hoja1", Optional intDestinoUnico As Integer = True)
+'    Dim db As DAO.Database, strPath As String
+'    Dim ws As Workspace
+'    Dim strSQl As String, strCFRef As String, strDocMod As String, strCarFus As String, strFinca As String,
+    Dim strDocName As String, i As Integer
+'    Dim strCri As String, strTipoAc As String, strCri2 As String
+    On Error GoTo Error_FusionDocModelo
+    ' Seleccionar modelo
+    If False Then 'Nz(DameValorParam("casConfimarDocModelo"), False) = True Then
+        strDocMod = SaveFileNameDlg("Indicar Fichero de Documento Modelo ", "*.doc", strDocMod)
+        If strDocMod = "" Then Exit Function
+    End If
+    'Abrir Word-------------------------------
+    Set oWord = CreateObject("Word.application")
+    oWord.Visible = True
+    oWord.Activate
+    Set docW = oWord.Documents.Open(strDocMod)
+'    If docW.MailMerge.MainDocumentType = wdNotAMergeDocument Then
+'        StatusBar = "Not a mail merge main document"
+'    Else
+'        StatusBar = "Document is a mail merge main document."
+'    End If
+'    Exit Function
+    If Right(strDataSourceName, 4) <> ".xls" Then strDataSourceName = strDataSourceName & ".xls"
+    
+    With docW.MailMerge
+        .MainDocumentType = wdFormLetters
+        .OpenDataSource Name:=strDataSourceName, Connection:=strDataSourceConnection
+        .destination = wdSendToNewDocument
+        .SuppressBlankLines = True
+        .Execute
+    End With
+    docW.Close wdDoNotSaveChanges
+    i = oWord.Documents.Count
+    oWord.Documents(i).Activate
+    strDocName = strDocDestino
+VerNombre:
+    strDocName = NombreCampoValido(strDocName)
+    If Dir(strDocName & ".doc") = "" Then
+        oWord.ActiveDocument.SaveAs (strDocName)
+        FusionDocModelo = strDocName
+    Else
+        If intDestinoUnico = True Then
+            'AppActivate DameValorParam("Puesto_AplicacionTitulo")
+            AppActivate Nz(DameValorParam("AplicacionTitulo"), "G4-GESTALEGRIA")
+            strDocName = InputBox("Se encontró un archivo existente denominado: " & strDocName & vbCrLf & _
+                    "Introduzca el nombre del documento nuevo generado:", "Nombre del documento generado", strDocName)
+                    
+            If strDocName <> "" Then
+                GoTo VerNombre
+            End If
+        Else
+            oWord.ActiveDocument.SaveAs (strDocName)
+            FusionDocModelo = strDocName
+        End If
+    End If
+    oWord.Activate
+Salir_FusionDocModelo:
+    Set oWord = Nothing
+    Set docW = Nothing
+    Exit Function
+Error_FusionDocModelo:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en FusionDocModelo " & vbCrLf & Err.Description
+'            oWord.Documents.Close
+            Resume Salir_FusionDocModelo
+            Resume Next
+    End Select
+    
+End Function
+Public Function AbrirDoc(strDoc As String)
+    Dim strDocName As String
+    On Error GoTo Error_AbrirDoc
+    If Right(strDoc, 3) = "xls" Then
+        Set mobjExcel = CreateObject("Excel.application")
+        mobjExcel.Visible = True
+        Set mxlsExcel = mobjExcel.Workbooks.Open(strDoc)
+    Else
+        'Abrir Word-------------------------------
+        Set mobjWord = CreateObject("Word.application")
+        mobjWord.Visible = True
+        Set mdocWord = mobjWord.Documents.Open(strDoc)
+        mobjWord.Activate
+    End If
+Salir_AbrirDoc:
+    Set mobjExcel = Nothing
+    Set mxlsExcel = Nothing
+    Set mobjWord = Nothing
+    Set mdocWord = Nothing
+    Exit Function
+Error_AbrirDoc:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en AbrirDoc " & vbCrLf & Err.Description
+            On Error Resume Next
+            'mobjWord.Documents.Close
+            Resume Salir_AbrirDoc
+            Resume Next
+    End Select
+End Function
+
+
+
+
+
+
+
+Public Function NombreCampoValido(ByVal str As String, Optional intIncluidoEspacio As Integer = False) As String
+    Dim i As Integer, strResult As String
+    strResult = str
+    For i = 1 To Len(str)
+        Select Case Mid(str, i, 1)
+            Case "-", "/", "?", "."
+                Mid(strResult, i, 1) = "_"
+            Case " "
+                If intIncluidoEspacio = True Then
+                    Mid(strResult, i, 1) = "_"
+                End If
+        End Select
+    Next i
+    NombreCampoValido = strResult
+
+End Function
+
+Public Sub ExportarSQL_Excel(strSQL As String, strFile As String)
+    On Error GoTo Error_ExportarSQL_Excel
+    Dim rs As Recordset, ws As Worksheet, i As Integer, j As Integer, z As Integer
+    DoCmd.Hourglass True
+    Set mobjExcel = CreateObject("Excel.application")
+    mobjExcel.Visible = False
+    If Len(strFile) < 5 Then
+        strFile = strFile & ".xls"
+    End If
+    If Right(strFile, 4) <> ".xls" Then
+        strFile = strFile & ".xls"
+    End If
+    If Dir(strFile) <> "" Then Kill strFile
+    Set mxlsExcel = mobjExcel.Workbooks.Add
+    Set ws = mxlsExcel.Worksheets(1)
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    For j = 0 To rs.Fields.Count - 1
+        ws.Cells(1, j + 1) = rs.Fields(j).Name
+    Next j
+    i = 1
+    If Not rs.EOF Then
+        rs.MoveLast
+        rs.MoveFirst
+    End If
+    z = rs.RecordCount
+    While Not rs.EOF
+        i = i + 1
+        For j = 0 To rs.Fields.Count - 1
+            ws.Cells(i, j + 1) = Left(rs.Fields(j), 32768)
+            'ws.Cells(i, j + 1) = rs.Fields(j)
+        Next j
+        rs.MoveNext
+        SysCmd acSysCmdSetStatus, "Generando Hoja Excel: " & i & "/" & z & " filas"
+    Wend
+    mxlsExcel.SaveAs (strFile)
+    mobjExcel.Quit
+    
+Salir_ExportarSQL_Excel:
+    DoCmd.Hourglass False
+    SysCmd acSysCmdClearStatus
+    Set mobjExcel = Nothing
+    Set mxlsExcel = Nothing
+    Set ws = Nothing
+    Exit Sub
+Error_ExportarSQL_Excel:
+    Select Case Err
+        Case 3190
+            MsgBox "Error nº " & Err & " en ExportarSQL_Excel" & vbCrLf & Err.Description
+            MsgBox "Probar a no incluir campos de contratos en el origen de datos"
+            Resume Salir_ExportarSQL_Excel
+        Case Else
+            MsgBox "Error nº " & Err & " en ExportarSQL_Excel" & vbCrLf & Err.Description
+            Resume Salir_ExportarSQL_Excel
+    End Select
+
+End Sub

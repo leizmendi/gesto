@@ -1,0 +1,198 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function GenerarFacturaDesdeAlbaran(lngIdAlbaranCab As Long, Optional datFF As Date = 0, Optional lngIdFacturaCab As Long = 0, Optional intForzarAgrup As Integer = False) As Long
+
+'Genera una factura con el contenido del albarán, si lngidfacturacab <> 0 y el cliente
+'tiene la opción de agrupar albaranes, se añaden las líneas del albarán a dicha factura
+'si no, se genera nueva factura
+'Devuelve el IdFacturaCab de la factura generada
+    On Error GoTo Error_GenerarFacturaDesdeAlbaran
+    Dim rsACab As Recordset, rsFCab As Recordset, rsADet As Recordset, rsFdet As Recordset, strSQL As String
+    Dim v As Variant
+    Dim rsCli As Recordset
+    strSQL = "SELECT * FROM tbAlbaranesCab WHERE IdAlbaranCab = " & lngIdAlbaranCab
+    Set rsACab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    If rsACab.EOF Then Exit Function
+'Ver si hay que generar nueva factura
+    If lngIdFacturaCab <> 0 Then
+        strSQL = "SELECT * FROM [Facturas cabeceras] WHERE [Nro Documento]= " & lngIdFacturaCab
+        Set rsFCab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+        If rsFCab.EOF Then
+        Else
+            If (Nz(DLookup("AgruparAlbaranesSN", "Clientes", "CIF = '" & rsFCab("CIF Facturar") & "'"), False) = True) _
+            Or (intForzarAgrup = True) Then
+                'Comprobar que coinciden Vendedor y descuento
+                'If rsFCab("VariosDtos") = False Then
+                '    If rsFCab("Descuento") <> rsACab("Descuento") Then
+                '        rsFCab.Edit
+                '        rsFCab("VariosDtos") = True
+                '        rsFCab("Descuento") = 0
+                '        rsFCab.Update
+                '    End If
+                'End If
+                'If rsFCab("CodVendedor") <> rsACab("CodVendedor") Then
+                '    MsgBox "Se encontraron diferentes vendedores en en albaranes de la factura: " & rsFCab("[Nro Documento]") & vbCrLf & _
+                '            "Se generará nueva factura"
+                '    GoTo NuevaFactura
+                'End If
+                
+                rsFCab.Edit
+                rsFCab("Origen") = "Se genera factura desde albaranes"
+                rsFCab.Update
+                GoTo GenerarDetalle
+            End If
+        End If
+    Else
+        Set rsFCab = CurrentDb.OpenRecordset("Facturas cabeceras", dbOpenDynaset)
+    End If
+NuevaFactura:
+    rsFCab.AddNew
+    'v = DMax("[Nro Documento]", "[Facturas Cabeceras]", "[Nro Documento] Like '" & Format(Date, "YY") & "/*'")
+    v = DMax("[Nro Documento]", "[Facturas Cabeceras]")
+    If IsNull(v) Or Left(v, 4) <> CStr(Year(Date)) Then
+        v = 1
+    Else
+        v = CLng(Mid(v, 5)) + 1
+    End If
+    rsFCab("[Nro Documento]") = Format(Date, "YYYY") & Format(v, "0000")
+    lngIdFacturaCab = rsFCab("[Nro Documento]")
+    If datFF = 0 Then datFF = Date
+    rsFCab("Fecha Factura") = datFF
+    rsFCab("[CIF Cliente]") = rsACab("CifFacturar")
+    rsFCab("[CIF Facturar]") = rsACab("CifFacturar")
+    rsFCab("Origen") = "Se genera factura desde albarán"
+    rsFCab("[RetencionIRPF%]") = Nz(DLookup("[RetencionIRPF%]", "Clientes", "CIF = '" & rsACab("CifFacturar") & "'"), 0)
+    rsFCab.Update
+GenerarDetalle:
+    Dim intDetallada As Integer, intLin As Integer
+    intDetallada = Nz(DLookup("[Factura Detallada]", "Clientes", "CIF = '" & rsACab("CifFacturar") & "'"), True)
+    If intDetallada = True Then
+        strSQL = "SELECT * FROM tbAlbaranesDet WHERE IdAlbaranCab = " & lngIdAlbaranCab
+    Else
+        strSQL = "SELECT tbAlbaranesDet.IdAlbaranCab, Sum([Cantidad]*[Precio]) AS Importe, tbAlbaranesDet.IVA"
+        strSQL = strSQL & " FROM tbAlbaranesDet"
+        strSQL = strSQL & " GROUP BY tbAlbaranesDet.IdAlbaranCab, tbAlbaranesDet.IVA"
+        strSQL = strSQL & " HAVING (((tbAlbaranesDet.IdAlbaranCab)=" & lngIdAlbaranCab & "));"
+    End If
+    Set rsADet = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    If rsADet.EOF Then Exit Function
+    strSQL = "SELECT * FROM [Facturas lineas] WHERE [Nro Documento] = " & lngIdFacturaCab
+    Set rsFdet = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    If intDetallada = True Then
+        rsFdet.AddNew
+        rsFdet("[Nro Documento]") = lngIdFacturaCab
+        If Len(rsACab("SuPedido")) > 0 Then
+            rsFdet("Concepto") = RecDerTop("Su Orden nº: " & rsACab("SuPedido"), 0, 30)
+        Else
+            rsFdet("Concepto") = RecDerTop("Albarán nº: " & rsACab("CodAlbaran") & " del " & Format(rsACab("FechaAlbaran"), "dd-mm-yy"), 0, 30)
+        End If
+        rsFdet("%IVA") = rsADet("IVA") * 100
+        rsFdet.Update
+        While Not rsADet.EOF
+            rsFdet.AddNew
+            rsFdet("[Nro Documento]") = lngIdFacturaCab
+            rsFdet("Id Tarifa") = rsADet("IdTarifa")
+            rsFdet("Matricula") = rsADet("Matricula")
+            rsFdet("Concepto") = rsADet("Concepto")
+            If rsADet("Cantidad") <> 1 And rsADet("Cantidad") <> 0 Then
+                rsFdet("Concepto") = rsFdet("Concepto") & "(" & rsADet("Cantidad") & ")"
+            End If
+            rsFdet("Precio") = rsADet("Precio") * rsADet("Cantidad")
+            rsFdet("%IVA") = rsADet("IVA") * 100
+            rsFdet.Update
+            rsADet.MoveNext
+        Wend
+    Else
+        While Not rsADet.EOF
+            rsFdet.AddNew
+            rsFdet("[Nro Documento]") = lngIdFacturaCab
+            If intLin = 0 Then
+                If Len(rsACab("SuPedido")) > 0 Then
+                    rsFdet("Concepto") = RecDerTop("Su Orden nº: " & rsACab("SuPedido"), 0, 30)
+                Else
+                    rsFdet("Concepto") = RecDerTop("Albarán nº: " & rsACab("CodAlbaran") & " del " & Format(rsACab("FechaAlbaran"), "dd-mm-yy"), 0, 30)
+                End If
+            Else
+            End If
+            intLin = intLin + 1
+            rsFdet("%IVA") = rsADet("IVA") * 100
+            rsFdet("Precio") = rsADet("Importe")
+            rsFdet.Update
+            rsADet.MoveNext
+        Wend
+    End If
+'Actualizar totales en [Facturas Cabeceras]...............................
+    PonTotalFactura lngIdFacturaCab
+'Actualizar cabecera de albarán
+    rsACab.Edit
+    rsACab("IdFacturaCab") = lngIdFacturaCab
+    rsACab.Update
+Salir_GenerarFacturaDesdeAlbaran:
+    GenerarFacturaDesdeAlbaran = lngIdFacturaCab
+    Exit Function
+Error_GenerarFacturaDesdeAlbaran:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en GenerarFacturaDesdeAlbaran" & vbCrLf & Err.Description
+            Resume Salir_GenerarFacturaDesdeAlbaran
+            Resume Next
+    End Select
+
+End Function
+Private Sub AplicarDto(sngDto As Single, lngIdFacturaCab As Long)
+    Dim strSQL As String, rs0 As Recordset, rs1 As Recordset
+    Dim curTotal As Currency, intHayVarios As Integer
+    On Error GoTo Error_AplicarDto
+    If sngDto = 0 Then Exit Sub
+    strSQL = "DELETE tbFacturasDet.IdFacturaCab, tbFacturasDet.EsDto"
+    strSQL = strSQL & " FROM tbFacturasDet"
+    strSQL = strSQL & " WHERE (((tbFacturasDet.IdFacturaCab)=" & lngIdFacturaCab & ") AND ((tbFacturasDet.EsDto)=True));"
+    CurrentDb.Execute strSQL, dbFailOnError
+    strSQL = "SELECT tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA, tbFacturasDet.RecEq, Sum([Cantidad]*[Precio]) AS ImporteLinea"
+    strSQL = strSQL & " FROM tbFacturasDet"
+    strSQL = strSQL & " GROUP BY tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA, tbFacturasDet.RecEq"
+    strSQL = strSQL & " HAVING (((tbFacturasDet.IdFacturaCab) = " & lngIdFacturaCab & "))"
+    strSQL = strSQL & " ORDER BY tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA;"
+
+'    strSQl = "SELECT tbFacturasDet.*"
+'    strSQl = strSQl & " FROM tbFacturasDet"
+'    strSQl = strSQl & " WHERE (((tbFacturasDet.IdFacturaCab)=" & lngIdFacturaCab & ") AND ((tbFacturasDet.EsDto)=False));"
+    Set rs0 = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    Set rs1 = CurrentDb.OpenRecordset("tbFacturasDet", dbOpenDynaset)
+    If Not rs0.EOF Then
+        rs0.MoveLast
+        rs0.MoveFirst
+        If rs0.RecordCount > 1 Then
+            intHayVarios = True
+        End If
+    End If
+    While Not rs0.EOF
+        curTotal = Round(-1 * rs0("ImporteLinea") * sngDto, 2)
+        If curTotal = 0 Then GoTo Siguiente
+        rs1.AddNew
+        rs1("IdFacturaCab") = lngIdFacturaCab
+        rs1("EsDto") = True
+        rs1("Concepto") = "Descuento: " & Format(sngDto, "Percent")
+        If intHayVarios Then
+            rs1("Concepto") = RecDerTop(rs1("Concepto") & " (IVA " & Format(rs0("IVA") * 100, "0") & "%)", 0, 30)
+        End If
+        rs1("Cantidad") = 1
+        rs1("Precio") = curTotal
+        rs1("IVA") = rs0("IVA")
+        rs1("RecEq") = rs0("RecEq")
+        rs1.Update
+Siguiente:
+        rs0.MoveNext
+    Wend
+Salir_AplicarDto:
+    Exit Sub
+Error_AplicarDto:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en AplicarDto" & vbCrLf & Err.Description
+            Resume Salir_AplicarDto
+            Resume Next
+    End Select
+End Sub

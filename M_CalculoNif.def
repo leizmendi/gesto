@@ -1,0 +1,5 @@
+Option Compare Database   'Usar orden de base de datos en comparaciones de cadenas
+
+Function CalculaNif(ByVal DNI As Long) As String
+    CalculaNif = Mid$("TRWAGMYFPDXBNJZSQVHLCKE", 1 + DNI Mod 23, 1)
+End Function

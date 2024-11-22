@@ -1,0 +1,184 @@
+Option Compare Database
+Option Explicit
+
+Public Function ComprobarVinculos()
+    Dim strCurDir As String, intR As Integer, strSQL As String
+    Dim strCarDatos As String, strCarDatos0 As String
+    strCurDir = miDirectorioDe(CurrentDb.Name)
+    If strCurDir = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '-X-X-'") Then
+        Call Titulo_e_Icono
+        Exit Function
+    Else
+        DoCmd.OpenForm "frm1"
+        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de Datos", "Carpeta Datos", strCurDir, , , , , True)
+        If strCarDatos = "" Then
+            MsgBox "Se cerrará la aplicación"
+            DoCmd.Quit
+        End If
+        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
+        DoCmd.Close acForm, "frm1"
+        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
+        strSQL = strSQL & " WHERE FicheroDeConexion Like 'GESTO-DA.mdb' OR FicheroDeConexion Like 'GESTO-DT_*.mdb' OR FicheroDeConexion Like 'GESTO-CFG.mdb'"
+        CurrentDb.Execute strSQL, dbFailOnError
+        strCarDatos0 = strCarDatos
+        DoCmd.OpenForm "frm1"
+        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de SIGA (bdVersion5xp.mdb)", "Carpeta SIGA", strCurDir, , , , , True)
+        If strCarDatos = "" Then
+            MsgBox "Se cerrará la aplicación"
+            DoCmd.Quit
+        End If
+        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
+        DoCmd.Close acForm, "frm1"
+        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
+        strSQL = strSQL & " WHERE FicheroDeConexion Like 'bdVersion5xp.mdb'"
+        CurrentDb.Execute strSQL, dbFailOnError
+        
+        ReconectarTablasYaVinculadas
+        PonValorParam "CarpetaDatos", strCarDatos0
+        intR = MsgBox("¿Volver a vincular la próxima vez que se inice el programa?", vbDefaultButton2 + vbYesNo + vbQuestion)
+        If intR = vbNo Then
+            strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioDeConexion = '" & strCurDir & "'"
+            strSQL = strSQL & " WHERE ((([1myConexionTablas].NombreTabla)='-X-X-'));"
+            CurrentDb.Execute strSQL, dbFailOnError
+        End If
+    End If
+    Call Titulo_e_Icono
+End Function
+
+Private Function miDirectorioDe(strFullPath As String) As String
+    Dim i As Integer
+    On Error GoTo Error_miDirectorioDe
+    For i = Len(strFullPath) To 1 Step -1
+        If Mid(strFullPath, i, 1) = "\" Then
+            miDirectorioDe = Left(strFullPath, i)
+            Exit For
+        End If
+    Next i
+Salir_miDirectorioDe:
+    Exit Function
+Error_miDirectorioDe:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en miDirectorioDe" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_miDirectorioDe
+End Function
+
+Public Function ComprobarOpciones()
+    On Error GoTo Error_ComprobarOpciones
+    Dim rs As Recordset, v As Variant, vOld As Variant, intCambiar As Integer
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM SysOpciones WHERE Activar = True", dbOpenDynaset, dbSeeChanges)
+    While Not rs.EOF
+        vOld = Application.GetOption(rs("ArgumentoOpcion"))
+        intCambiar = False
+        Select Case rs("TipoOpcion")
+            Case 1
+                If vOld <> rs("OP_SN") Then
+                    v = rs("OP_SN")
+                    intCambiar = True
+                End If
+            Case 2
+                If vOld <> rs("OP_TXT") Then
+                    v = rs("OP_TXT")
+                    intCambiar = True
+                End If
+            Case 3
+                If vOld <> rs("OP_NUM") Then
+                    v = rs("OP_NUM")
+                    intCambiar = True
+                End If
+        End Select
+        rs.Edit
+        If intCambiar = False Then
+            rs("Cambiado") = False
+        Else
+            SetOption rs("ArgumentoOpcion"), v
+            rs("Cambiado") = True
+            Select Case rs("TipoOpcion")
+                Case 1
+                    rs("OP_SN_OLD") = vOld
+                Case 2
+                    rs("OP_TXT_OLD") = vOld
+                Case 3
+                    rs("OP_NUM_OLD") = vOld
+            End Select
+        End If
+        rs.Update
+        rs.MoveNext
+    Wend
+Salir_ComprobarOpciones:
+    Exit Function
+Error_ComprobarOpciones:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en ComprobarOpciones" & vbCrLf & Err.Description
+            Resume 'Salir_ComprobarOpciones
+    End Select
+    
+End Function
+
+Public Function ReponerOpciones()
+    On Error GoTo Error_ReponerOpciones
+    Dim rs As Recordset, v As Variant, intCambiar As Integer
+    
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM SysOpciones WHERE Activar = True AND Cambiado = True")
+    While Not rs.EOF
+        Select Case rs("TipoOpcion")
+            Case 1
+                v = rs("OP_SN_OLD")
+            Case 2
+                v = rs("OP_TXT_OLD")
+            Case 3
+                v = rs("OP_NUM_OLD")
+        End Select
+        SetOption rs("ArgumentoOpcion"), v
+        rs.MoveNext
+    Wend
+Salir_ReponerOpciones:
+    Exit Function
+Error_ReponerOpciones:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en ReponerOpciones" & vbCrLf & Err.Description
+            Resume Salir_ReponerOpciones
+    End Select
+    
+End Function
+
+Public Function Titulo_e_Icono()
+    Dim intX As Integer
+    Dim strPath As String, strTitulo As String, strIco As String
+    strTitulo = NuloEs(DameValorParam("AplicacionTitulo"), "G4-GESTALEGRIA")
+    intX = AddPropAp("AppTitle", dbText, strTitulo)
+    strPath = miDirectorioDe(CurrentDb.Name)
+    strIco = DameValorParam("CarpetaDatos") & NuloEs(DameValorParam("AplicacionIcono"), "gA.ico")
+    If Dir(strIco) = "" Then
+        strIco = strPath & strIco
+    End If
+    intX = AddPropAp("AppIcon", dbText, strIco)
+    RefreshTitleBar
+End Function
+
+Public Function AddPropAp(strName As String, varType As Variant, varValue As Variant) As Integer
+    Dim dbs As DAO.Database, prp As Object
+    Const conPropNotFoundError = 3270
+
+    Set dbs = CurrentDb
+    On Error GoTo AddProp_Err
+    dbs.Properties(strName) = varValue
+
+AddPropAp = True
+
+AddProp_Bye:
+    Exit Function
+
+AddProp_Err:
+    If Err = conPropNotFoundError Then
+        Set prp = dbs.CreateProperty(strName, varType, varValue)
+        dbs.Properties.Append prp
+        Resume Next
+    Else
+        AddPropAp = False
+        Resume AddProp_Bye
+    End If
+End Function

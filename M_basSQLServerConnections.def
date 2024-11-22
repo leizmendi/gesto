@@ -1,0 +1,130 @@
+Option Compare Database
+Option Explicit
+
+
+'//Name     :   AttachDSNLessTable
+'//Purpose  :   Create a linked table to SQL Server without using a DSN
+'//Parameters
+'//     stLocalTableName: Name of the table that you are creating in the current database
+'//     stRemoteTableName: Name of the table that you are linking to on the SQL Server database
+'//     stServer: Name of the SQL Server that you are linking to
+'//     stDatabase: Name of the SQL Server database that you are linking to
+'//     stUsername: Name of the SQL Server user who can connect to SQL Server, leave blank to use a Trusted Connection
+'//     stPassword: SQL Server user password
+Function AttachDSNLessTable(stLocalTableName As String, stRemoteTableName As String, stServer As String, stDatabase As String, Optional stUsername As String, Optional stPassword As String, Optional bNoBorrar As Boolean = False)
+    On Error GoTo AttachDSNLessTable_Err
+    Dim td As TableDef
+    Dim stConnect As String
+    If Not bNoBorrar Then
+        For Each td In CurrentDb.TableDefs
+            If td.Name = stLocalTableName Then
+                CurrentDb.TableDefs.Delete stLocalTableName
+                Exit For
+            End If
+        Next
+    End If
+    'GoTo AttachDSNLessTable_Exit
+    If Len(stUsername) = 0 Then
+        '//Use trusted authentication if stUsername is not supplied.
+        stConnect = "ODBC;DRIVER=SQL Server;SERVER=" & stServer & ";DATABASE=" & stDatabase & ";Trusted_Connection=Yes"
+    Else
+        '//WARNING: This will save the username and the password with the linked table information.
+        stConnect = "ODBC;DRIVER=SQL Server;SERVER=" & stServer & ";DATABASE=" & stDatabase & ";UID=" & stUsername & ";PWD=" & stPassword
+    End If
+    Set td = CurrentDb.CreateTableDef(stLocalTableName, dbAttachSavePWD, stRemoteTableName, stConnect)
+    CurrentDb.TableDefs.Append td
+    AttachDSNLessTable = True
+AttachDSNLessTable_Exit:
+    Exit Function
+
+AttachDSNLessTable_Err:
+    
+    AttachDSNLessTable = False
+    MsgBox "AttachDSNLessTable encountered an unexpected error: " & Err.Description
+    Resume AttachDSNLessTable_Exit
+End Function
+
+Private Sub SQL_Execute(stSQL As String, stServer As String, stDatabase As String, Optional stUsername As String, Optional stPassword As String)
+
+'    Dim cn As ADODB.Connection
+'    'Dim Sql As String
+'    Dim stConnect As String
+'    On Error GoTo Error_Crear_Tabla
+'    If Len(stUsername) = 0 Then
+'        '//Use trusted authentication if stUsername is not supplied.
+'        stConnect = "ODBC;DRIVER=SQL Server;SERVER=" & stServer & ";DATABASE=" & stDatabase & ";Trusted_Connection=Yes"
+'        Set cn = New ADODB.Connection ' abrimos la conexión a la base de datos
+'        cn.Open stConnect
+'    Else
+'        '//WARNING: This will save the username and the password with the linked table information.
+'        stConnect = "ODBC;DRIVER=SQL Server;SERVER=" & stServer & ";DATABASE=" & stDatabase '& ";UID=" & stUsername & ";PWD=" & stPassword
+'        Set cn = New ADODB.Connection ' abrimos la conexión a la base de datos
+'        cn.Open stConnect, stUsername, stPassword
+'    End If
+'
+'
+'
+'
+'
+'    ' En esta sentencia tienes que definir la estructura de campis de la tabla que quieres crear:
+'
+'    'Sql = "CREATE TABLE " & stLocalTableName & "(" & _
+'                      "Id COUNTER CONSTRAINT miIndice UNIQUE, " & _
+'                      "Cliente NUMBER NOT NULL, " & _
+'                      "Fecha DATE NOT NULL, " & _
+'                      "Nombre VARCHAR(40) ," & _
+'                      "Numero NUMBER ," & _
+'                      "Activo YESNO )"
+'
+'    cn.Execute stSQL, , adCmdText
+Salir_Crear_Tabla:
+    Exit Sub
+Error_Crear_Tabla:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Crear_Tabla" & vbCrLf & Err.Description
+            Resume Salir_Crear_Tabla
+    End Select
+End Sub
+
+Public Sub ReconectarTablasSQLServer(sServer As String, sDB As String, sUser As String, sPass As String)
+    On Error GoTo HandleError
+    Dim rs As Recordset, i As Integer, j As Integer
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM 1myConexionTablas" _
+                                & " WHERE PrefijoConexion Like 'ODBC;DRIVER=SQL Server*'", dbOpenSnapshot)
+    rs.MoveLast
+    rs.MoveFirst
+    j = rs.RecordCount
+    While Not rs.EOF
+        DoEvents
+        i = i + 1
+        On Error Resume Next
+        CurrentDb.TableDefs.Delete rs("NombreTabla")
+        On Error GoTo HandleError
+        MensajeBusyBox rs("NombreTabla") & " " & i & "/" & j, "Eliminando tablas SQL Server"
+        rs.MoveNext
+    Wend
+    rs.MoveFirst
+    While Not rs.EOF
+        DoEvents
+        i = i + 1
+        AttachDSNLessTable rs("NombreTabla"), "dbo." & rs("NombreTabla"), sServer, sDB, sUser, sPass, True
+        SysCmd acSysCmdSetStatus, rs("NombreTabla") & " " & i & "/" & j
+        MensajeBusyBox rs("NombreTabla") & " " & i & "/" & j, "Reconectando tablas SQL Server"
+        rs.MoveNext
+    Wend
+    SysCmd acSysCmdClearStatus
+    MensajeBusyBox "OK " & i & " tablas revinculadas a SQL SErver", "Fin - Reconectando tablas SQL Server", False, True
+    DoCmd.RunMacro "mcGenerarTablaDeVinculadas"
+    
+    
+HandleExit:
+    Exit Sub
+HandleError:
+    MsgBox Err.Description
+    Resume 'HandleExit
+End Sub
+
+Public Function pepe()
+    AttachDSNLessTable "Matriculaciones", "dbo.Matriculaciones", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+End Function

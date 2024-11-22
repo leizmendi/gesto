@@ -1,0 +1,213 @@
+Option Compare Database
+Option Explicit
+
+Rem File/Open Dialog for 32 bit mode
+' Hacked from Solutions.mdb by Trevor Best Dec 1997
+' The functions to call are OpenFileNameDlg() and
+' SaveFileNameDlg()
+
+Declare Function GetOpenFileName Lib "comdlg32.dll" Alias _
+    "GetOpenFileNameA" (pOpenfilename As OPENFILENAME) As Boolean
+Declare Function GetSaveFileName Lib "comdlg32.dll" Alias _
+    "GetSaveFileNameA" (pOpenfilename As OPENFILENAME) As Boolean
+
+Type MSA_OPENFILENAME
+    ' Filter string used for the Open dialog filters.
+    ' Use MSA_CreateFilterString() to create this.
+    ' Default = All Files, *.*
+    strFilter As String
+    ' Initial Filter to display.
+    ' Default = 1.
+    lngFilterIndex As Long
+    ' Initial directory for the dialog to open in.
+    ' Default = Current working directory.
+    strInitialDir As String
+    ' Initial file name to populate the dialog with.
+    ' Default = "".
+    strInitialFile As String
+    strDialogTitle As String
+    ' Default extension to append to file if user didn't specify one.
+    ' Default = System Values (Open File, Save File).
+    strDefaultExtension As String
+    ' Flags (see constant list) to be used.
+    ' Default = no flags.
+    lngFlags As Long
+    ' Full path of file picked.  When the File Open dialog box is
+    ' presented, if the user picks a nonexistent file,
+    ' only the text in the "File Name" box is returned.
+    strFullPathReturned As String
+    ' File name of file picked.
+    strFileNameReturned As String
+    ' Offset in full path (strFullPathReturned) where the file name
+    ' (strFileNameReturned) begins.
+    intFileOffset As Integer
+    ' Offset in full path (strFullPathReturned) where the file extension begins.
+    intFileExtension As Integer
+End Type
+
+Const ALLFILES = "All Files"
+
+Type OPENFILENAME
+    lStructSize As Long
+    hwndOwner As Long
+    hInstance As Long
+    lpstrFilter As String
+    lpstrCustomFilter As Long
+    nMaxCustrFilter As Long
+    nFilterIndex As Long
+    lpstrFile As String
+    nMaxFile As Long
+    lpstrFileTitle As String
+    nMaxFileTitle As Long
+    lpstrInitialDir As String
+    lpstrTitle As String
+    Flags As Long
+    nFileOffset As Integer
+    nFileExtension As Integer
+    lpstrDefExt As String
+    lCustrData As Long
+    lpfnHook As Long
+    lpTemplateName As Long
+End Type
+
+Const OFN_ALLOWMULTISELECT = &H200
+Const OFN_CREATEPROMPT = &H2000
+Const OFN_EXPLORER = &H80000
+Const OFN_FILEMUSTEXIST = &H1000
+Const OFN_HIDEREADONLY = &H4
+Const OFN_NOCHANGEDIR = &H8
+Const OFN_NODEREFERENCELINKS = &H100000
+Const OFN_NONETWORKBUTTON = &H20000
+Const OFN_NOREADONLYRETURN = &H8000
+Const OFN_NOVALIDATE = &H100
+Const OFN_OVERWRITEPROMPT = &H2
+Const OFN_PATHMUSTEXIST = &H800
+Const OFN_READONLY = &H1
+Const OFN_SHOWHELP = &H10
+
+
+Private Function MSA_GetSaveFileName(msaof As MSA_OPENFILENAME) As Integer
+' Opens the file save dialog.
+    
+    Dim of As OPENFILENAME
+    Dim intRet As Integer
+
+    MSAOF_to_OF msaof, of
+    of.Flags = of.Flags Or OFN_HIDEREADONLY
+    intRet = GetSaveFileName(of)
+    If intRet Then
+        OF_to_MSAOF of, msaof
+    End If
+    MSA_GetSaveFileName = intRet
+End Function
+
+
+Private Function MSA_GetOpenFileName(msaof As MSA_OPENFILENAME) As Integer
+' Opens the Open dialog.
+    
+    Dim of As OPENFILENAME
+    Dim intRet As Integer
+
+    MSAOF_to_OF msaof, of
+    intRet = GetOpenFileName(of)
+    If intRet Then
+        OF_to_MSAOF of, msaof
+    End If
+    MSA_GetOpenFileName = intRet
+End Function
+
+
+Private Sub OF_to_MSAOF(of As OPENFILENAME, msaof As MSA_OPENFILENAME)
+' This sub converts from the Win32 structure to the Microsoft Access structure.
+    
+    msaof.strFullPathReturned = Left(of.lpstrFile, InStr(of.lpstrFile, vbNullChar) - 1)
+    msaof.strFileNameReturned = of.lpstrFileTitle
+    msaof.intFileOffset = of.nFileOffset
+    msaof.intFileExtension = of.nFileExtension
+End Sub
+
+Private Sub MSAOF_to_OF(msaof As MSA_OPENFILENAME, of As OPENFILENAME)
+' This sub converts from the Microsoft Access structure to the Win32 structure.
+    
+    Dim strFile As String * 512
+
+    ' Initialize some parts of the structure.
+    of.hwndOwner = Application.hWndAccessApp
+    of.hInstance = 0
+    of.lpstrCustomFilter = 0
+    of.nMaxCustrFilter = 0
+    of.lpfnHook = 0
+    of.lpTemplateName = 0
+    of.lCustrData = 0
+    
+    If msaof.strFilter = "" Then
+        of.lpstrFilter = "All Files" & vbNullChar & "*.*" & vbNullChar & vbNullChar ' MSA_CreateFilterString(ALLFILES)
+    Else
+        of.lpstrFilter = msaof.strFilter
+    End If
+    of.nFilterIndex = msaof.lngFilterIndex
+    
+    of.lpstrFile = msaof.strInitialFile _
+        & String(512 - Len(msaof.strInitialFile), 0)
+    of.nMaxFile = 511
+
+    of.lpstrFileTitle = String(512, 0)
+    of.nMaxFileTitle = 511
+
+    of.lpstrTitle = msaof.strDialogTitle
+
+    of.lpstrInitialDir = msaof.strInitialDir
+    
+    of.lpstrDefExt = msaof.strDefaultExtension
+
+    of.Flags = msaof.lngFlags
+    
+    of.lStructSize = Len(of)
+End Sub
+
+Function OpenFileNameDlg(pstrTitle As String, pstrFilter As String, Optional pstrInitialDir As String) As String
+    ' Get Open File Name, to be backward compatible with the
+    ' Access 2.0 version that passed "title", "filter|spec" params
+    Dim strFilter  As String
+    
+    strFilter = CreateFilterString(pstrFilter)
+
+    Dim msaof As MSA_OPENFILENAME
+    
+    ' Set options for the dialog box.
+    msaof.strDialogTitle = pstrTitle
+    msaof.strInitialDir = pstrInitialDir
+    msaof.strFilter = strFilter 'MSA_CreateFilterString("Databases", "*.mdb")
+    
+    ' Call the Open dialog routine.
+    MSA_GetOpenFileName msaof
+    
+    ' Return the path and file name.
+    OpenFileNameDlg = Trim(msaof.strFullPathReturned)
+End Function
+
+Function SaveFileNameDlg(pstrTitle As String, pstrFilter As String, pstrDefault As String) As String
+    Dim msaof As MSA_OPENFILENAME
+    Dim intRet As Integer
+    Dim strFilter As String
+    
+    strFilter = CreateFilterString(pstrFilter)
+    
+    msaof.strFilter = strFilter
+    msaof.strDialogTitle = pstrTitle
+    msaof.strInitialFile = pstrDefault
+    
+    intRet = MSA_GetSaveFileName(msaof)
+    SaveFileNameDlg = Trim(msaof.strFullPathReturned)
+End Function
+Private Function CreateFilterString(pstrFilter As String) As String
+    Dim strFilter As String
+    strFilter = pstrFilter
+    Do Until Right(strFilter, 2) = "||"
+        strFilter = strFilter & "|"
+    Loop
+    Do While InStr(strFilter, "|")
+        Mid(strFilter, InStr(strFilter, "|"), 1) = vbNullChar
+    Loop
+    CreateFilterString = strFilter
+End Function

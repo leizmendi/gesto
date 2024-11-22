@@ -1,0 +1,99 @@
+Option Compare Database
+Option Explicit
+
+Public Function NombreCliente(strNombreCompleto As String, Optional ByRef strAp1, Optional ByRef strAp2, Optional ByRef strNombre)
+    On Error GoTo Error_NombreCliente
+    Dim i As Integer, strClave As String, intSP As Integer
+    Dim Espacios(0 To 25) As Integer, h As Integer, j As Integer
+    strAp1 = ""
+    strAp2 = ""
+    strNombre = ""
+    strNombreCompleto = CambiaTexto(strNombreCompleto, "  ", " ")
+    i = InStr(strNombreCompleto, ",")
+    If i > 0 Then
+        strNombre = Trim(RecDerTop(Mid(strNombreCompleto, i + 1), 0, 18))
+        If i > 1 Then
+            strNombreCompleto = Trim(Left(strNombreCompleto, i - 1))
+        End If
+    End If
+    For i = 1 To Len(strNombreCompleto)
+        If Mid(strNombreCompleto, i, 1) = " " Then
+            intSP = intSP + 1
+            Espacios(intSP) = i
+        End If
+    Next i
+    If intSP = 0 Then
+        If Len(strNombreCompleto) > 26 Then
+            strAp1 = Mid(strNombreCompleto, 1, 26)
+            strAp2 = RecDerTop(Mid(strNombreCompleto, 27), 0, 26)
+        Else
+            strAp1 = strNombreCompleto
+        End If
+    ElseIf intSP = 1 Then
+        strAp1 = Trim(RecDerTop(Left(strNombreCompleto, Espacios(1) - 1), 0, 26))
+        strAp2 = Trim(RecDerTop(Mid(strNombreCompleto, Espacios(1) + 1), 0, 26))
+    Else
+Ap1:
+        For i = 1 To 24
+            Select Case Espacios(i)
+                Case Is > 26
+                    If i = 1 Then
+                        strAp1 = RecDerTop(strNombreCompleto, 0, 26)
+                        Espacios(0) = 26
+                    Else
+                        strAp1 = Left(strNombreCompleto, Espacios(i - 1))
+                        Espacios(0) = Espacios(i - 1)
+                    End If
+                    GoTo Ap2
+                Case 0
+                    If i = 1 Then
+                        If Len(strNombreCompleto) > 26 Then
+                            strAp1 = RecDerTop(strNombreCompleto, 0, 26)
+                            Espacios(0) = 26
+                        Else
+                            strAp1 = strNombreCompleto
+                            Espacios(0) = Len(strNombreCompleto)
+                        End If
+                    Else
+                        strAp1 = Left(strNombreCompleto, Espacios(i - 1))
+                        Espacios(0) = Espacios(i - 1)
+                    End If
+                    GoTo Ap2
+            End Select
+        Next i
+Ap2:
+        strAp2 = RecDerTop(Mid(strNombreCompleto, Espacios(0) + 1), 0, 26)
+    End If
+    'Dim strR As String
+    'strR = "Nombre: " & ConComillas(strNombre) & vbCrLf
+    'strR = strR & "Apellido1: " & ConComillas(strAp1) & vbCrLf
+    'strR = strR & "Apellido2: " & ConComillas(strAp2)
+    'NombreCliente = strR
+Salir_NombreCliente:
+    Exit Function
+Error_NombreCliente:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en NombreCliente" & vbCrLf & Err.Description
+            Resume Salir_NombreCliente
+    End Select
+End Function
+
+
+Public Function DimeDireccionCliente(strCIF As String, Optional strNumDireccion As String = "0") As String
+    On Error GoTo Error_DimeDireccionCliente
+    Dim strDir As String
+    strDir = Nz(DLookup("Nombre", "Clientes", "CIF = '" & strCIF & "'"), "") & vbCrLf
+    strDir = strDir & Nz(DLookup("Dirección", "[Direcciones Clientes]", "CIF = '" & strCIF & "' AND [Nro de Dirección] = '" & strNumDireccion & "'"), "") & vbCrLf
+    strDir = strDir & Nz(DLookup("Trim([Código Postal] & ' ' & [Población] & ' (' & [Provincia] & ')')", "[Direcciones Clientes]", "CIF = '" & strCIF & "' AND [Nro de Dirección] = '" & strNumDireccion & "'"), "")
+    DimeDireccionCliente = strDir
+Salir_DimeDireccionCliente:
+    Exit Function
+Error_DimeDireccionCliente:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en DimeDireccionCliente" & vbCrLf & Err.Description
+            Resume Salir_DimeDireccionCliente
+    End Select
+
+End Function

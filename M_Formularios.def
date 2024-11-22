@@ -1,0 +1,96 @@
+Option Compare Database   'Usar orden de base de datos en comparaciones de cadenas
+Option Explicit
+
+Sub Existe_Clave1(Tabla As String, CampoClave As String, Clave As Control, ControlClave As String)
+
+    'Dim miBD As DAO.Database
+    Dim RsTabla As Recordset
+
+    ' Compruebo si existe el equipo
+    'Set miBD = DBEngine.Workspaces(0).OpenDatabase(Bdatos, False, True)
+    Set RsTabla = CurrentDb.OpenRecordset(Tabla, dbOpenSnapshot)
+    ''RsTabla.Index = CampoClave
+        
+    RsTabla.FindFirst ("[" & CampoClave & "]=" & Clave)
+    If Not RsTabla.NoMatch Then
+        MsgBox "El " & CampoClave & " " & Clave & " ya existe en " & Tabla
+        ControlClave = ""
+        SendKeys "+{TAB}"
+        SendKeys "{ESC}"
+    End If
+
+    RsTabla.Close
+    'miBD.Close
+
+End Sub
+
+Sub Inicializar_Formulario_Normal(Optional intANuevo As Integer = True, Optional intAUltimo As Integer = False)
+
+    DoCmd.Maximize
+    Screen.ActiveForm.NavigationButtons = True
+    Screen.ActiveForm.ScrollBars = 2
+    Screen.ActiveForm.MenuBar = "Barra de Menús"
+
+    If intANuevo Then DoCmd.GoToRecord A_FORM, Screen.ActiveForm.Caption, A_NEWREC
+    If intAUltimo Then DoCmd.GoToRecord A_FORM, Screen.ActiveForm.Caption, acLast
+
+End Sub
+
+Sub IrARegistro(CampoClave As String, Clave As Control, SiguienteCampo As String)
+On Error GoTo Err_IrARegistro
+    Dim RecuerdoClave As String
+    If Not IsNull(Clave) Then
+        DoCmd.GoToControl CampoClave
+        If CampoClave = "CIF" Then
+            If IsNumeric(Clave.value) And Len(Clave.value) = 8 Then
+                Clave = Clave & letra_dni(Clave)
+            Else
+                If Left(Clave, 1) = "X" And IsNumeric(Mid(Clave, 2)) Then
+                    Clave = Clave & letra_dni(Mid(Clave, 2))
+                End If
+            End If
+        End If
+        RecuerdoClave = Clave
+        DoCmd.RunCommand acCmdUndo
+        DoCmd.RunCommand acCmdUndo
+        'DoCmd.DoMenuItem A_FORMBAR, A_EDITMENU, A_UNDOFIELD, , A_MENU_VER20
+        'DoCmd.DoMenuItem A_FORMBAR, A_EDITMENU, A_UNDOFIELD, , A_MENU_VER20
+        'SendKeys "{ESC}"
+        DoCmd.FindRecord RecuerdoClave, A_ENTIRE, False, A_DOWN, False, A_CURRENT, True
+        If Clave <> RecuerdoClave Or IsNull(Clave) Then
+            DoCmd.GoToRecord , , A_NEWREC
+            Clave = RecuerdoClave
+        End If
+        DoCmd.GoToControl SiguienteCampo
+    End If
+Exit_IrARegistro:
+    Exit Sub
+Err_IrARegistro:
+    If Err = 2137 Or Err = 2046 Then '2046 = el comando deshacer no está disponible
+        Resume Next
+    Else
+        MsgBox "Error nº " & Err & vbCrLf & Error$
+        Resume Exit_IrARegistro
+    End If
+End Sub
+
+Function UltimoNroDocumento() As Long
+    
+    'Dim miBD As DAO.Database
+    Dim RsTabla As Recordset
+
+    '' Compruebo si existe el equipo
+    'Set miBD = DBEngine.Workspaces(0).OpenDatabase(Bdatos, False, True)
+    'Set RsTabla = currentdb.OpenRecordset("Facturas cabeceras", dbopensnapshot)
+    ''RsTabla.Index = "Nro Documento"
+    '
+    'If RsTabla.EOF Then
+    '    UltimoNroDocumento = 1
+    'Else
+    '    RsTabla.MoveLast
+    '    UltimoNroDocumento = RsTabla![Nro Documento] + 1
+    'End If
+    'RsTabla.Close
+    'miBD.Close
+    UltimoNroDocumento = NuloEs(DMax("[Nro Documento]", "Facturas cabeceras"), 0) + 1
+End Function

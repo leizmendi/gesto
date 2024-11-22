@@ -1,0 +1,98 @@
+Option Compare Database
+Option Explicit
+
+Public Sub AñadirReciboDeFactura(lngNroDocumento As Long, lngIdReciboEmision As Long)
+    On Error GoTo Error_AñadirReciboDeFactura
+    Dim strSQL As String, rs As Recordset, rsR As Recordset, curRetencion As Currency, lngNumRecibo As Long
+    If Nz(DLookup("FicheroRemesa", "tbRecibosEmisiones", "IdReciboEmision = " & lngIdReciboEmision), "") <> "" Then
+        MsgBox "La Remesa Nº " & lngIdReciboEmision & " ya está generada, se debe poder modificar para incluir nuevos recibos", vbExclamation
+        Exit Sub
+    End If
+    
+    strSQL = "SELECT [Facturas cabeceras].[Nro Documento], Clientes.CIF, Clientes.Nombre, Clientes.CodigoEntidad, Clientes.CodigoSucursal, Clientes.DigitoControl, Clientes.NumeroCuenta, [Facturas cabeceras].TotalImporte, [Facturas cabeceras].BaseRetencionIRPF, [Facturas cabeceras].[RetencionIRPF%], Clientes.PagoDomiciliadoSN"
+    strSQL = strSQL & ", [Facturas cabeceras].NumRecibo, [Facturas cabeceras].Cobrada, [Facturas cabeceras].Observaciones"
+    strSQL = strSQL & " FROM [Facturas cabeceras] INNER JOIN Clientes ON [Facturas cabeceras].[CIF Facturar] = Clientes.CIF"
+    strSQL = strSQL & " WHERE [Facturas cabeceras].[Nro Documento]=" & lngNroDocumento
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    If rs.EOF Then
+        MsgBox "No se encontró la Factura Nro: " & lngNroDocumento, vbExclamation
+        Exit Sub
+    End If
+    If Nz(rs("PagoDomiciliadoSN"), False) = False Then
+        MsgBox "El cliente " & rs("Nombre") & " no está marcado como de pago domiciliado", vbExclamation
+        Exit Sub
+    End If
+    If IsNull(rs("CodigoEntidad")) Or IsNull(rs("CodigoSucursal")) Or IsNull(rs("DigitoControl")) Or IsNull(rs("NumeroCuenta")) Then
+        MsgBox "El cliente " & rs("Nombre") & " no tiene el número de cuenta completo:" & _
+        Nz(rs("CodigoEntidad"), "????") & "-" & Nz(rs("CodigoSucursal"), "????") & "-" & Nz(rs("DigitoControl"), "??") & "-" & Nz(rs("NumeroCuenta"), "??????????"), vbExclamation
+        Exit Sub
+    End If
+    Dim lngIdAnt As Long, intR As Integer
+    lngIdAnt = Nz(DLookup("NumRecibo", "[Facturas Cabeceras]", "[Nro Documento] = " & lngNroDocumento), 0)
+    If lngIdAnt <> 0 Then
+        intR = MsgBox("La Factura Nº " & lngNroDocumento & " ya tiene un Nº de recibo asignado" & vbCrLf & "Recibo nº: " & lngIdAnt & vbCrLf & "¿Volver a generar el recibo?", vbQuestion + vbYesNo)
+        If intR = vbNo Then Exit Sub
+    End If
+    strSQL = "SELECT * FROM tbRecibos"
+    strSQL = strSQL & " WHERE IdReciboEmision = " & lngIdReciboEmision
+    Set rsR = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    While Not rs.EOF
+        rsR.AddNew
+        rsR("ENTIDAD") = rs("CodigoEntidad")
+        rsR("OFICINA") = rs("CodigoSucursal")
+        rsR("CODREF") = rs("CIF")
+        rsR("NIF_O") = DLookup("NIF_ORDENANTE", "Ordenante")
+        rsR("SUFIJO_O") = DLookup("SUFIJO_ORDENANTE", "Ordenante")
+        rsR("Nombre") = rs("Nombre")
+        rsR("DIGCONT") = rs("DigitoControl")
+        rsR("NUMCUENTA") = rs("NumeroCuenta")
+        curRetencion = Nz(rs("RetencionIRPF%"), 0) * Nz(rs("BaseRetencionIRPF"), 0)
+        rsR("IMPORTE") = rs("TotalImporte") - curRetencion
+        rsR("CONCEPTO") = "Factura Nº " & lngNroDocumento
+        lngNumRecibo = Nz(DMax("NUMRECIBO", "tbRecibos"), 0) + 1
+        rsR("NUMRECIBO") = lngNumRecibo
+        rsR("IdReciboEmision") = lngIdReciboEmision
+        rsR("CIF_Cliente") = rs("CIF")
+        rsR.Update
+        If curRetencion <> 0 Then
+            strSQL = "INSERT INTO tbRecibosDet(NumRecibo, Linea, Concepto, Importe)"
+            strSQL = strSQL & " SELECT " & lngNumRecibo & " AS num, 1 as lin, 'Total Importe Factura' as con, " & ComaPunto(rs("TotalImporte")) & " as tot"
+            CurrentDb.Execute strSQL, dbFailOnError
+            strSQL = "INSERT INTO tbRecibosDet(NumRecibo, Linea, Concepto, Importe)"
+            strSQL = strSQL & " SELECT " & lngNumRecibo & " AS num, 2 as lin, 'Retención IRPF' as con, " & ComaPunto(-1 * curRetencion) & " as tot"
+            CurrentDb.Execute strSQL, dbFailOnError
+            strSQL = "UPDATE tbRecibos SET Detalle = True WHERE NUMRECIBO = " & lngNumRecibo
+            CurrentDb.Execute strSQL, dbFailOnError
+        End If
+        rs.Edit
+        rs("NumRecibo") = lngNumRecibo
+        rs("Cobrada") = True
+        rs("Observaciones") = IIf(Nz(rs("Observaciones"), "") = "", "", rs("Observaciones") & " - ") & "Cobrado Remesa Recibos Nº " & lngIdReciboEmision & ", Fecha: " & Format(DLookup("FechaCargo", "tbRecibosEmisiones", "IdReciboEmision = " & lngIdReciboEmision), "dd/mm/yy")
+        rs.Update
+        'strSQL = "UPDATE [Facturas cabeceras] SET NumRecibo = " & lngNumRecibo
+        'strSQL = strSQL & ", Cobrada = True"
+        'strSQL = strSQL & ", Observaciones = Observaciones & ' - Cobrado Remesa Recibos Nº " & lngIdReciboEmision & ", Fecha: " & Format(DLookup("FechaCarga", "tbRecibosEmisioneS", "IdReciboEmision = " & lngIdReciboEmision), "dd/mm/yy") & "'"
+        'strSQL = strSQL & " WHERE [Nro Documento]=" & lngNroDocumento
+        
+        rs.MoveNext
+    Wend
+    If IsOpenForm("frmRecibosEmisiones") Then
+        Call Forms("frmRecibosEmisiones").ActualizarMisTotales
+    Else
+        Dim intNumRecibos As Integer, curTotal As Currency
+        intNumRecibos = DCount("NUMRECIBO", "tbRecibos", "IdReciboEmision = " & lngIdReciboEmision)
+        curTotal = DSum("IMPORTE", "tbRecibos", "IdReciboEmision = " & lngIdReciboEmision)
+        strSQL = "UPDATE tbRecibosEmisiones SET NumRecibos = " & intNumRecibos & ", TotalImporte = " & ComaPunto(curTotal)
+        strSQL = strSQL & " WHERE IdReciboEmision = " & lngIdReciboEmision
+        CurrentDb.Execute strSQL, dbFailOnError
+    End If
+Salir_AñadirReciboDeFactura:
+    Exit Sub
+Error_AñadirReciboDeFactura:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en AñadirReciboDeFactura" & vbCrLf & Err.Description
+            Resume Salir_AñadirReciboDeFactura
+    End Select
+
+End Sub

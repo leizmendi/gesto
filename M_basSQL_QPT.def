@@ -1,0 +1,392 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function Q_p_t(sSQL As String, _
+                      Optional sConnect As String = "", _
+                      Optional bReturnsRecords As Boolean = True, _
+                      Optional bNoTry As Boolean = False, _
+                      Optional bResult As Boolean, _
+                      Optional lRecordsAffected As Long) As Object
+    On Error GoTo HandleError
+    Dim qdf As DAO.QueryDef, rst As DAO.Recordset, iErr0 As Long, iErr1 As Long
+    
+    bNoTry = True ' Da errores al acceder a tabla errores.... lo quito pfff
+    
+    If sConnect = "" Then sConnect = GetConnectSQL(sSQL)
+    If sConnect = "" Then GoTo HandleExit
+    Set qdf = CurrentDb.CreateQueryDef("")
+    qdf.Connect = sConnect '"ODBC;Driver=SQL Server;Server=.\SQLEXPRESS;Trusted_Connection=Yes;"
+    'sSQL = Replace(sSQL, """", "'")
+    sSQL = Replace(sSQL, "'*", "'%")
+    sSQL = Replace(sSQL, "*'", "%'")
+    sSQL = Replace(sSQL, "Nz(", "ISNULL(")
+    sSQL = Replace(sSQL, "&", "+")
+    sSQL = ReplaceFechasToSQL(sSQL)
+    If Not bNoTry Then
+        sSQL = "BEGIN TRY" & _
+              " " & sSQL & _
+              " END TRY" & _
+              " BEGIN CATCH" & _
+              " EXECUTE usp_SaveErrorInfo;" & _
+              " END CATCH;"
+    End If
+    qdf.SQL = sSQL
+    qdf.ReturnsRecords = bReturnsRecords
+    
+    'If Not IsMissing(iErr) Then
+    If Not bNoTry Then
+        If InStr(sConnect, "Albenzaide") = 0 Then iErr0 = SQL_MyLastError(sConnect)
+    End If
+    If bReturnsRecords Then
+        Set rst = qdf.OpenRecordset
+        lRecordsAffected = qdf.RecordsAffected
+        Set Q_p_t = rst
+    Else
+        qdf.Execute dbFailOnError
+        lRecordsAffected = qdf.RecordsAffected
+        Set Q_p_t = Nothing
+    End If
+    If False Then 'Not bNoTry Then
+        If InStr(sConnect, "Albenzaide") = 0 Then
+            iErr1 = SQL_MyLastError(sConnect)
+            If iErr1 <> iErr0 Then
+                'MsgBox GetErrorMessage(iErr1), vbExclamation
+            Else
+                bResult = True
+            End If
+        Else
+            bResult = True
+        End If
+    Else
+        bResult = True
+    End If
+    'Debug.Print rst!qryTest
+    'rst.Close
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    
+    Resume HandleExit
+End Function
+
+
+Public Function QPT_ADO(sSQL As String, _
+                      Optional sConnect As String = "", _
+                      Optional bReturnsRecords As Boolean = True, _
+                      Optional bNoTry As Boolean = False, _
+                      Optional bResult As Boolean) As Object
+    On Error GoTo HandleError
+    
+'    bNoTry = True ' Da errores al acceder a tabla errores.... lo quito pfff
+'
+'
+'    Dim cn As ADODB.Connection
+'    'Dim qdf As dao.QueryDef, rst As dao.Recordset
+'    Dim iErr0 As Long, iErr1 As Long
+'    Dim rs As ADODB.Recordset
+'    If sConnect = "" Then sConnect = GetStringConnADO("G", True)
+'    If sConnect = "" Then GoTo HandleExit
+'    sSQL = Replace(sSQL, """", "'")
+'    sSQL = Replace(sSQL, "'*", "'%")
+'    sSQL = Replace(sSQL, "*'", "%'")
+'    sSQL = Replace(sSQL, "Nz(", "ISNULL(")
+'    If Not bNoTry Then
+'        sSQL = "BEGIN TRY" & _
+'              " " & sSQL & _
+'              " END TRY" & _
+'              " BEGIN CATCH" & _
+'              " EXECUTE usp_SaveErrorInfo;" & _
+'              " END CATCH;"
+'    End If
+'
+'    If Not bNoTry Then iErr0 = SQL_MyLastError_ADO(sConnect)
+'    If bReturnsRecords Then
+'        'Set rst = qdf.OpenRecordset
+'        Set rs = New ADODB.Recordset
+'        rs.Open sSQL, sConnect
+'        Set QPT_ADO = rs
+'    Else
+'        Set cn = New ADODB.Connection
+'        cn.ConnectionString = sConnect
+'        cn.Open
+'        cn.Execute sSQL
+'        cn.Close
+'        'qdf.Execute dbFailOnError
+'        Set QPT_ADO = Nothing
+'    End If
+'    If Not bNoTry Then
+'        iErr1 = SQL_MyLastError_ADO(sConnect)
+'        If iErr1 <> iErr0 Then
+'            MsgBox GetErrorMessage(iErr1), vbExclamation
+'        Else
+'            bResult = True
+'        End If
+'    Else
+'        bResult = True
+'    End If
+'    'Debug.Print rst!qryTest
+'    'rst.Close
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    
+    Resume HandleExit
+End Function
+
+
+
+Public Function GetConnectSQL(sSQL As String) As String
+    On Error GoTo HandleError
+    Dim i As Integer, i2 As Integer, i3 As Integer, j As Integer, j0 As Integer, j2 As Integer, sTable As String, sR As String
+    i = InStr(1, sSQL, "UPDATE ", vbBinaryCompare)
+    If i = 0 Then i2 = InStr(1, sSQL, "FROM ", vbBinaryCompare)
+    If i = 0 And i2 = 0 Then i3 = InStr(1, sSQL, "INSERT INTO ", vbBinaryCompare)
+    If i = 0 And i2 = 0 And i3 = 0 Then
+        MsgBox "No se encontró ni UPDATE ni FROM ni INSERT INTO en SQL", vbExclamation
+        GoTo HandleExit
+    End If
+    i = IIf(i > 0, i + 7, IIf(i2 > 0, i2 + 5, i3 + 12))
+    j = InStr(i, sSQL, " ")
+    j0 = InStr(i, sSQL, "(")
+    If j0 > 0 And j0 < j Then j = j0
+    j2 = InStr(i, sSQL, vbCr)
+    If j2 > 0 And j2 < j Then j = j2
+    j2 = InStr(i, sSQL, vbLf)
+    If j2 > 0 And j2 < j Then j = j2
+    If j = 0 Then j = InStr(i, sSQL, "(")
+    If j = 0 Then
+        MsgBox "No se encontró nombre de tabla para conexión", vbExclamation
+        GoTo HandleExit
+    End If
+    sTable = Replace(Trim(Mid(sSQL, i, j - i)), "(", "")
+    If sTable Like "dbo.*" Then sTable = Mid(sTable, 5)
+    
+    sR = Nz(DLookup("[PrefijoConexion] & [FicheroDeConexion]", "1myConexionTablas", "NombreTabla = '" & sTable & "'"), "")
+    If sR = "" Then sR = Nz(DLookup("[PrefijoConexion] & [FicheroDeConexion]", "1myConexionVistas", "NombreTabla = '" & sTable & "'"), "")
+    If sR = "" Then
+        MsgBox "No se encontró cadena de conexión para SQL", vbExclamation
+        GoTo HandleExit
+    End If
+    GetConnectSQL = sR
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Public Function GetConnectTabla(sTable As String) As String
+    On Error GoTo HandleError
+    Dim sR As String
+    sR = Nz(DLookup("[PrefijoConexion] & [FicheroDeConexion]", "1myConexionTablas", "NombreTabla = '" & sTable & "'"), "")
+    If sR = "" Then sR = Nz(DLookup("[PrefijoConexion] & [FicheroDeConexion]", "1myConexionVistas", "NombreTabla = '" & sTable & "'"), "")
+    If sR = "" Then
+        MsgBox "No se encontró cadena de conexión para Tabla: " & sTable, vbExclamation
+        GoTo HandleExit
+    End If
+    GetConnectTabla = sR
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Public Function GetStringConn() As String 'Optional sAlbenzaide_Gendocs As String = "G" _
+                            , Optional bAsAdmin As Boolean = False _
+                            , Optional sUser As String = "" _
+                            , Optional sPass As String = "") As String
+    On Error GoTo HandleError
+    Dim sR As String, sFicheroConexion As String, sSufijoGD As String
+    sR = GetConnectTabla("Matriculaciones")
+'    If sAlbenzaide_Gendocs = "G" Then
+'        sR = GetConnectTabla("GD_Proyectos")
+'        sFicheroConexion = "Gendocs"
+'        sSufijoGD = IIf(Nz(DLookup("[FicheroDeConexion]", "1myConexionTablas", "NombreTabla = 'GD_Proyectos'"), "") = "Gendocs_DESARROLLO", "dev", "pro")
+'    Else
+'        sR = GetConnectTabla("DT_Proyectos")
+'        sFicheroConexion = "Albenzaide"
+'    End If
+'    If bAsAdmin Or (sUser <> "" And sPass <> "") Then
+'        Dim i As Integer, j As Integer
+'Ver_UID:
+'        i = InStr(sR, ";UID=")
+'        If i = 0 Then
+'            i = InStr(sR, "Trusted_Connection=Yes;")
+'            If i > 0 Then
+'                sR = Replace(sR, "Trusted_Connection=Yes;", "UID=;PWD=;")
+'                GoTo Ver_UID
+'            End If
+'            MsgBox "No se encontró referencia a UID en cadena de conexión", vbExclamation
+'            GoTo Result
+'        End If
+'        i = i + 5
+'        j = InStr(i, sR, ";PWD=")
+'        If j = 0 Then
+'            MsgBox "No se encontró referencia a PWD en cadena de conexión", vbExclamation
+'            GoTo Result
+'        End If
+'        If bAsAdmin Then
+'            sR = Left(sR, i - 1) & Trim(EncryptString("User@FML", GetParam(sFicheroConexion & "UserID" & sSufijoGD, False), 2)) & Mid(sR, j)
+'        Else
+'            sR = Left(sR, i - 1) & sUser & Mid(sR, j)
+'        End If
+'        j = InStr(i, sR, ";PWD=")
+'        i = j + 5
+'        j = InStr(i, sR, ";")
+'        If j = 0 Then
+'            MsgBox "No se encontró referencia a APP en cadena de conexión", vbExclamation
+'            GoTo HandleExit
+'        End If
+'        If bAsAdmin Then
+'            sR = Left(sR, i - 1) & Trim(EncryptString("User@FML", GetParam(sFicheroConexion & "Password" & sSufijoGD, False), 2)) & Mid(sR, j)
+'        Else
+'            sR = Left(sR, i - 1) & sPass & Mid(sR, j)
+'        End If
+'    End If
+'Result:
+    GetStringConn = sR
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+
+Public Function gsc() As String
+    gsc = GetStringConn()
+End Function
+
+Public Function gsc_ado(Optional sAlbenzaide_Gendocs As String = "G" _
+                            , Optional bAsAdmin As Boolean = False) As String
+    'gsc_ado = GetStringConnADO(sAlbenzaide_Gendocs, bAsAdmin)
+End Function
+
+Public Function SQL_MyLastError(Optional sConnect As String = "") As Long
+    On Error GoTo HandleError
+    Dim qdf As DAO.QueryDef, rst As DAO.Recordset, vR As Variant
+    If sConnect = "" Then sConnect = gsc()
+    If sConnect = "" Then GoTo HandleExit
+    Set qdf = CurrentDb.CreateQueryDef("")
+    qdf.Connect = sConnect
+    qdf.SQL = "SELECT TOP 1 ErrorId FROM DB_Errors WHERE UserName = SUSER_SNAME() ORDER BY ErrorId DESC"
+    qdf.ReturnsRecords = True
+    Set rst = qdf.OpenRecordset
+    If Not rst.EOF Then vR = rst(0)
+    SQL_MyLastError = Nz(vR)
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+'Public Function SQL_MyLastError_ADO(Optional sConnect As String = "") As Long
+'    On Error GoTo HandleError
+'    Dim rs As ADODB.Recordset, sSQL As String, vR As Variant
+'    If sConnect = "" Then sConnect = GetStringConnADO("G", True)
+'    If sConnect = "" Then GoTo HandleExit
+'    Set rs = New ADODB.Recordset
+'    sSQL = "SELECT TOP 1 ErrorId FROM DB_Errors WHERE UserName = SUSER_SNAME() ORDER BY ErrorId DESC"
+'    rs.Open sSQL, sConnect
+'    If Not rs.EOF Then vR = rs(0)
+'    SQL_MyLastError_ADO = Nz(vR)
+'HandleExit:
+'    Exit Function
+'HandleError:
+'    MsgBox Err.Description
+'    Resume HandleExit
+'End Function
+'
+'Public Function GetErrorMessage(lErrorId As Long) As String
+'    On Error GoTo HandleError
+'    Dim rst As ADODB.Recordset, vR As Variant 'qdf As dao.QueryDef
+'    'If sConnect = "" Then sConnect = gsc("G", True)
+'    'If sConnect = "" Then GoTo HandleExit
+'    'Set qdf = CurrentDb.CreateQueryDef("")
+'    'qdf.Connect = sConnect '"ODBC;Driver=SQL Server;Server=.\SQLEXPRESS;Trusted_Connection=Yes;"
+'    'qdf.SQL = "SELECT ErrorMessage FROM DB_Errors WHERE ErrorId = " & lErrorId
+'    'qdf.ReturnsRecords = True
+'    'Set rst = qdf.OpenRecordset
+'
+'    Set rst = QPT_ADO("SELECT ErrorMessage FROM DB_Errors WHERE ErrorId = " & lErrorId, gsc_ado(, True))
+'    If Not rst.EOF Then vR = rst(0)
+'
+'    GetErrorMessage = Nz(vR)
+'HandleExit:
+'    Exit Function
+'HandleError:
+'    MsgBox Err.Description
+'    Resume HandleExit
+'End Function
+'
+
+Public Function FDate(dt As Date) As String
+'Formatea fecha para SQL
+    FDate = ConComillas(Format(dt, "yyyy-mm-dd"))
+End Function
+
+Public Function FFecha(sFecha As String, Optional sSep As String = "-") As String
+'Formatea fecha yyyy-mm-dd etc a dd-mm-yyyy
+    On Error Resume Next
+    FFecha = Mid(sFecha, 9, 2) & sSep & Mid(sFecha, 6, 2) & sSep & Mid(sFecha, 1, 4)
+End Function
+
+''?Q_P_T("SELECT SYSTEM_USER + ' - ' + APP_NAME() + ' - ' + HOST_NAME()",gsc("G",false))(0)
+
+
+
+Function DimeValorTipo2SQL(vValor As Variant _
+                     , iTipo As Integer _
+            , Optional vIsNull As Variant = Null) As String
+    Dim val As Variant, sR As String
+    On Error GoTo HandleError
+    'Devuelve un valor como String para ser utilizado en una sentencia UPDATE o INSERT INTO --- VALUES
+    If IsNull(vValor) And Not IsNull(vIsNull) Then
+        val = vIsNull
+    Else
+        val = vValor
+    End If
+    If IsNull(val) Then
+        sR = "Null"
+    Else
+        Select Case iTipo
+            Case dbInteger, dbLong, dbByte
+                sR = CStr(val)
+            Case dbSingle, dbDouble, dbCurrency
+                sR = Replace(CStr(val), ",", ".")
+            Case dbDate
+                If CLng(DateValue(CDate(val))) = 0 Then
+                    sR = "'" & Format(CDate(val), "hh:nn") & "'"
+                Else
+                '2024-10-03 00:00:00', 120)
+                    sR = "CONVERT(DATETIME, '" & Format(CDate(val), "yyyy-mm-dd hh:nn") & "', 120)"
+                End If
+            Case dbBoolean
+                sR = IIf(val, 1, 0)
+            Case Else
+                sR = "'" & Replace(CStr(val), "'", """") & "'"
+        End Select
+    End If
+    DimeValorTipo2SQL = sR
+    
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+
+Function vts(vValor As Variant _
+                     , iTipo As Integer _
+            , Optional vIsNull As Variant = Null) As String
+    vts = DimeValorTipo2SQL(vValor, iTipo, vIsNull)
+End Function

@@ -1,0 +1,203 @@
+Option Compare Database
+Option Explicit
+
+Public Function ComprobarCampos()
+    Dim fld As Field, strMsg As String
+    Dim rs As Recordset, y As Long, z As Long
+    On Error Resume Next
+    
+    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("WebBanco")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "WebBanco", dbText, 150) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbRecibosEmisiones").Fields("FicheroRemesa")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbRecibosEmisiones", "FicheroRemesa", dbText, 150) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("Nombre_Ordenante")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "Nombre_Ordenante", dbText, 40) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("NIF_Ordenante")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "NIF_Ordenante", dbText, 12) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("Sufijo_Ordenante")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "Sufijo_Ordenante", dbText, 3) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbRecibos").Fields("CIF_Cliente")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbRecibos", "CIF_Cliente", dbText, 10) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("NumRecibo")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "NumRecibo", dbLong) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("PagoDomiciliadoSN")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "PagoDomiciliadoSN", dbBoolean) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("CodigoEntidad")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "CodigoEntidad", dbText, 4) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("CodigoSucursal")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "CodigoSucursal", dbText, 4) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("DigitoControl")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "DigitoControl", dbText, 2) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("NumeroCuenta")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "NumeroCuenta", dbText, 10) & vbCrLf
+    End If
+    
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("[RetencionIRPF%]")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "[RetencionIRPF%]", dbCurrency) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("BaseRetencionIRPF")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "BaseRetencionIRPF", dbCurrency) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("[RetencionIRPF%]")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "[RetencionIRPF%]", dbCurrency) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("TotalImporte")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "TotalImporte", dbCurrency) & vbCrLf
+        ' Marcar todas las facturas pagadas
+        Set rs = CurrentDb.OpenRecordset("SELECT [Nro Documento] FROM [Facturas cabeceras]", dbOpenSnapshot)
+        DoCmd.Hourglass True
+        If Not rs.EOF Then
+            rs.MoveLast
+            rs.MoveFirst
+        End If
+        z = rs.RecordCount
+        While Not rs.EOF
+            PonTotalFactura rs("Nro Documento")
+            rs.MoveNext
+            y = y + 1
+            SysCmd acSysCmdSetStatus, "Grabando Importe de Facturas: " & y & "/" & z
+        Wend
+        SysCmd acSysCmdClearStatus
+        DoCmd.Hourglass False
+    End If
+    
+    Set fld = CurrentDb.TableDefs("Clientes").Fields("AgruparAlbaranesSN")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("Clientes", "AgruparAlbaranesSN", dbBoolean) & vbCrLf
+        CurrentDb.Execute "UPDATE Clientes SET AgruparAlbaranesSN = True", dbFailOnError
+        strMsg = strMsg & EstablecerPropiedad("Clientes", "AgruparAlbaranesSN", "DefaultValue", True) & vbCrLf
+    End If
+    Set fld = CurrentDb.TableDefs("tbAlbaranesCab").Fields("CifFacturar")
+    If Err <> 0 Then
+        strMsg = strMsg & Añadir_Campo("tbAlbaranesCab", "CifFacturar", dbText, 20) & vbCrLf
+        EstablecerPropiedad "tbAlbaranesCab", "CifFacturar", "Required", True, True
+    End If
+    If strMsg <> "" Then MsgBox strMsg
+End Function
+
+Public Function Añadir_Campo(strTabla As String, strNombreCampo As String, intTipo As Integer, Optional intSize As Integer = 0, Optional intMensajeSN As Integer = False) As String
+'Genera nuevos campos en "& strtabla &"
+    On Error GoTo Error_Añadir_Campo
+    
+    Dim db As DAO.Database, ws As Workspace, strMDB As String
+    Dim tdf As TableDef, fld As Field, ind As Index
+    On Error GoTo Error_Añadir_Campo
+    If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
+        strMDB = DirectorioDe(CurrentDb.Name)
+    Else
+        strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    End If
+    strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    Set ws = DBEngine.Workspaces(0)
+    Set db = ws.OpenDatabase(strMDB)
+    
+    Set tdf = db.TableDefs(strTabla)
+    If intSize = 0 Then
+        Set fld = tdf.CreateField(strNombreCampo, intTipo)
+    Else
+        Set fld = tdf.CreateField(strNombreCampo, intTipo, intSize)
+    End If
+    tdf.Fields.Append fld
+    Set tdf = Nothing
+    Añadir_Campo = "Se añadió el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+Salir_Añadir_Campo:
+    Exit Function
+Error_Añadir_Campo:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Añadir_Campo" & vbCrLf & Err.Description
+            Añadir_Campo = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+            Resume Salir_Añadir_Campo
+    End Select
+End Function
+
+Public Function EstablecerPropiedad(strTabla As String, strNombreCampo As String, strPropiedad As String, vValue As Variant, Optional intMensajeSN As Integer = False) As String
+'Genera nuevos campos en "& strtabla &"
+    On Error GoTo Error_EstablecerPropiedad
+    
+    Dim db As DAO.Database, ws As Workspace, strMDB As String
+    Dim tdf As TableDef, fld As Field, ind As Index, prp As Property
+    On Error GoTo Error_EstablecerPropiedad
+    If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
+        strMDB = DirectorioDe(CurrentDb.Name)
+    Else
+        strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    End If
+    strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    Set ws = DBEngine.Workspaces(0)
+    Set db = ws.OpenDatabase(strMDB)
+    
+    Set tdf = db.TableDefs(strTabla)
+    Set fld = tdf(strNombreCampo)
+    Set prp = fld.Properties(strPropiedad)
+    prp.value = vValue
+    EstablecerPropiedad = "Se asignó el valor " & vValue & "para la propiedad " & strPropiedad & " del campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+Salir_EstablecerPropiedad:
+    Exit Function
+Error_EstablecerPropiedad:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en EstablecerPropiedad" & vbCrLf & Err.Description
+            EstablecerPropiedad = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+            Resume Salir_EstablecerPropiedad
+    End Select
+End Function
+
+Public Sub PonTotalFactura(lngNroFactura As Long)
+    On Error GoTo Error_PonTotalFactura
+    Dim strSQL As String, curTotal As Currency, curBaseRet As Currency
+    curTotal = Nz(DSum("[Precio]*(1+[%IVA]/100)", "Facturas lineas", "[Nro Documento] = " & lngNroFactura), 0)
+    curTotal = Round(curTotal, 2)
+    curBaseRet = Nz(DSum("[Precio]", "Facturas lineas", "[Nro Documento] = " & lngNroFactura & " AND [%IVA]<>0"), 0)
+    curBaseRet = Round(curBaseRet, 2)
+    strSQL = "UPDATE [Facturas cabeceras] SET [Facturas cabeceras].TotalImporte = " & ComaPunto(curTotal)
+    strSQL = strSQL & ", BaseRetencionIRPF = " & ComaPunto(curBaseRet)
+    strSQL = strSQL & " WHERE ((([Facturas cabeceras].[Nro Documento])=" & lngNroFactura & "));"
+    CurrentDb.Execute strSQL, dbFailOnError
+Salir_PonTotalFactura:
+    Exit Sub
+Error_PonTotalFactura:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en PonTotalFactura" & vbCrLf & Err.Description
+            Resume Salir_PonTotalFactura
+    End Select
+End Sub
+
+Public Function ComaPunto(ByVal vStr As Variant) As Variant
+Dim i As Integer
+Bucle:
+    i = InStr(i + 1, vStr, ",")
+    If i > 0 Then
+        Mid(vStr, i, 1) = "."
+        GoTo Bucle
+    End If
+    ComaPunto = vStr
+End Function

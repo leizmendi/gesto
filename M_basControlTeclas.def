@@ -1,0 +1,153 @@
+Option Compare Database
+Option Explicit
+
+Public Sub ControlTeclas(frm As Form, KeyCode As Integer, Shift As Integer, strTeclas As String)
+    Dim intShiftDown As Integer, intCtrlDown As Integer
+    Dim intAltDown As Integer, StrControlName As String ', intEsBoton As Integer
+    Dim ctl As Control, strKey As String
+    Dim intEsBoton As Integer
+    On Error GoTo Error_ControlTeclas
+    intShiftDown = (Shift And acShiftMask) > 0
+    intCtrlDown = (Shift And acCtrlMask) > 0
+    intAltDown = (Shift And acAltMask) > 0
+    If intCtrlDown Then strKey = "CTRL_"
+    If intAltDown Then strKey = strKey & "ALT_"
+    If intShiftDown Then strKey = strKey & "SHIFT_"
+    If KeyCode >= vbKeyF1 And KeyCode <= vbKeyF12 Then
+        strKey = strKey & "F" & (KeyCode - 111)
+    ElseIf strKey = "" Then ' si no se ha pulsado CTRL, ni ALT, ni SHIFT, ni tecla de función
+        Exit Sub
+    ElseIf KeyCode >= vbKey0 And KeyCode <= vbKey9 Then
+        strKey = strKey & (KeyCode - 48)
+    ElseIf KeyCode >= vbKeyNumpad0 And KeyCode <= vbKeyNumpad9 Then
+        strKey = strKey & (KeyCode - 96)
+    ElseIf KeyCode >= vbKeyA And KeyCode <= vbKeyZ Then '65-->90
+        strKey = strKey & KeycodeDeLetra(KeyCode)
+    ElseIf KeyCode = 220 Then 'º
+        strKey = strKey & "0"
+    ElseIf KeyCode = 192 Then 'º
+        strKey = strKey & "Ñ"
+    End If
+    
+    If strKey = "F12" Then
+'        Call DimeControlPtsEuros
+'        KeyCode = 0
+'        Exit Sub
+    ElseIf strKey = "F8" Then
+        Call BloqueoFormulario(frm)
+        KeyCode = 0
+        Exit Sub
+    End If
+    If strKey <> "" Then
+        If Right(strKey, 1) <> "_" Then
+            StrControlName = DimeControlDeTecla(strKey, strTeclas, intEsBoton)
+        End If
+    End If
+    If StrControlName <> "" Then
+        Select Case intEsBoton
+            Case 2  'StrControlName es el nombre de una macro
+                DoCmd.RunMacro StrControlName
+            Case -1 'StrControlName es el nombre de un botón
+                Call frm.MisBotones(StrControlName)
+            Case Else 'StrControlName es el nombre de un control
+                Set ctl = frm.Controls(StrControlName)
+                If ctl.Visible And ctl.Enabled Then
+                    ctl.SetFocus
+                End If
+        End Select
+        KeyCode = 0
+        Exit Sub
+    End If
+Salir_ControlTeclas:
+    Exit Sub
+Error_ControlTeclas:
+    Select Case Err
+        Case Else
+            MsgBox Err.Description & vbCrLf & "Error nº " & Err _
+            & vbCrLf & "En ControlTeclas"
+    End Select
+    Resume Salir_ControlTeclas
+    Resume Next
+End Sub
+Public Function DimeControlDeTecla(strKey As String, strTeclas As String, intEsBoton As Integer) As String
+    'busca strKey en strTeclas y si la encuentra, devuelve el control asociado
+    Dim i As Integer, j As Integer
+    DimeControlDeTecla = ""
+    i = InStr(strTeclas, "|" & strKey & "|")
+    If i > 0 Then
+        j = InStr(i + 2 + Len(strKey), strTeclas, "#")
+        If j = 0 Then Exit Function
+        i = InStr(j + 1, strTeclas, "#")
+        If i = 0 Then Exit Function
+        DimeControlDeTecla = Mid(strTeclas, j + 1, i - (j + 1))
+        If Len(strTeclas) > i Then
+            If Mid(strTeclas, i + 1, 1) = "¬" Then
+                intEsBoton = True
+            ElseIf Mid(strTeclas, i + 1, 1) = "!" Then
+                intEsBoton = 2 ' Es el nombre de una macro
+            End If
+        End If
+    End If
+End Function
+
+Public Function KeycodeDeLetra(KeyCode As Integer) As String
+    Dim strK As String
+    Select Case KeyCode
+        Case vbKeyA
+            strK = "A"
+        Case vbKeyB
+            strK = "B"
+        Case vbKeyC
+            strK = "c"
+        Case vbKeyD
+            strK = "D"
+        Case vbKeyE
+            strK = "E"
+        Case vbKeyF
+            strK = "F"
+        Case vbKeyG
+            strK = "G"
+        Case vbKeyH
+            strK = "H"
+        Case vbKeyI
+            strK = "I"
+        Case vbKeyJ
+            strK = "J"
+        Case vbKeyK
+            strK = "K"
+        Case vbKeyL
+            strK = "L"
+        Case vbKeyM
+            strK = "M"
+        Case vbKeyN
+            strK = "N"
+        Case vbKeyO
+            strK = "O"
+        Case vbKeyP
+            strK = "P"
+        Case vbKeyQ
+            strK = "Q"
+        Case vbKeyR
+            strK = "R"
+        Case vbKeyS
+            strK = "S"
+        Case vbKeyT
+            strK = "T"
+        Case vbKeyU
+            strK = "U"
+        Case vbKeyV
+            strK = "V"
+        Case vbKeyW
+            strK = "W"
+        Case vbKeyX
+            strK = "X"
+        Case vbKeyY
+            strK = "Y"
+        Case vbKeyZ
+            strK = "Z"
+    End Select
+    If KeyCode = 192 Then
+        strK = "Ñ"
+    End If
+    KeycodeDeLetra = strK
+End Function

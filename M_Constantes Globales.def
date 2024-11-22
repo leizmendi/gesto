@@ -1,0 +1,28 @@
+' ---------------------------------------------------------------------------
+' 1.00  30-Jun-97 COMPUTADORES NAVARRA,SA
+'                 Versión inicial.
+' ---------------------------------------------------------------------------
+' Constantes Globales
+' ---------------------------------------------------------------------------
+
+'Global Const Bdatos = "I:\_DOCS1_\ALEGRIA\GESTO-DA.MDB"
+Global Const TTextos = "WINWORD.EXE"
+
+Global Const M_SÍNO = 4
+Global Const M_ICONOEXCLAMACIÓN = 48
+Global Const M_DEFBOTÓN1 = 0
+Global Const M_DEFBOTÓN2 = 256
+Global Const M_DEFBOTÓN3 = 512
+Global Const RespSÍ = 6, RespNO = 7
+Global Const ValorEuro = 166.386
+Global Const PlanPrever = 80000
+
+' ---------------------------------------------------------------------------
+' Variables Globales
+' ---------------------------------------------------------------------------
+
+Global EsCopia As Integer
+
+Function euro(ByVal valorpts As Long) As Double
+    euro = valorpts / ValorEuro
+End Function

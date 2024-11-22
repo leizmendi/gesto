@@ -1,0 +1,253 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function DirectorioDe(strFullPath As String) As String
+    Dim i As Integer
+    On Error GoTo Error_DirectorioDe
+    For i = Len(strFullPath) To 1 Step -1
+        If Mid(strFullPath, i, 1) = "\" Then
+            DirectorioDe = Left(strFullPath, i)
+            Exit For
+        End If
+    Next i
+Salir_DirectorioDe:
+    Exit Function
+Error_DirectorioDe:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en DirectorioDe" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_DirectorioDe
+End Function
+Private Function MdbDe(strFullPath As String) As String
+    Dim i As Integer
+    On Error GoTo Error_MdbDe
+    For i = Len(strFullPath) To 1 Step -1
+        If Mid(strFullPath, i, 1) = "\" Then
+'            strElArchivo = Right(strFullPath, Len(strFullPath) - i)
+'            strElDirectorio = Left(strFullPath, i)
+            MdbDe = Right(strFullPath, Len(strFullPath) - i)
+            Exit For
+        End If
+    Next i
+Salir_MdbDe:
+    Exit Function
+Error_MdbDe:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en MdbDe" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_MdbDe
+End Function
+
+Private Function DirectorioDeConexion(strConnect As String) As String
+    Dim i As Integer, j As Integer, j2 As Integer
+    On Error GoTo Error_DirectorioDeConexion
+    j = InStr(strConnect, ";")
+    j2 = InStr(j + 1, strConnect, "DATABASE=")
+    If j2 = 0 Then
+        j2 = j + 1
+    Else
+        j2 = j2 + 9
+    End If
+    DirectorioDeConexion = DirectorioDe(Mid(strConnect, j2))
+Salir_DirectorioDeConexion:
+    Exit Function
+Error_DirectorioDeConexion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en DirectorioDeConexion" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_DirectorioDeConexion
+End Function
+Private Function MdbDeConexion(strConnect As String) As String
+    Dim i As Integer, j As Integer, j2 As Integer
+    On Error GoTo Error_MdbDeConexion
+    j = InStr(strConnect, ";")
+    j2 = InStr(j + 1, strConnect, "DATABASE=")
+    If j2 = 0 Then
+        j2 = j + 1
+    Else
+        j2 = j2 + 9
+    End If
+    MdbDeConexion = MdbDe(Mid(strConnect, j2))
+Salir_MdbDeConexion:
+    Exit Function
+Error_MdbDeConexion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en MdbDeConexion" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_MdbDeConexion
+End Function
+
+Private Function IniDeConexion(strConnect As String) As String
+    Dim i As Integer, j As Integer, j2 As Integer
+    On Error GoTo Error_IniDeConexion
+    j = InStr(strConnect, ";")
+    j2 = InStr(j + 1, strConnect, "DATABASE=")
+    If j2 = 0 Then
+        j2 = j + 1
+    Else
+        j2 = j2 + 9
+    End If
+    IniDeConexion = Left(strConnect, j2 - 1)
+Salir_IniDeConexion:
+    Exit Function
+Error_IniDeConexion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en IniDeConexion" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_IniDeConexion
+End Function
+
+Public Function CrearTablaConexiones() As Integer
+    Dim db As DAO.Database
+    Dim rs As Recordset
+    Dim strMensaje As String, varReturn As Variant
+    Dim strConn As String, strPre As String, strDir As String, strFile As String, strCurrentDir As String
+    Dim i As Integer, j As Integer
+    On Error GoTo Error_CrearTablaConexiones
+    Set db = CurrentDb
+    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset)
+    
+    'strPathNow = db.Name
+    'strPathNow = DirectorioDe(strPathNow)
+    strCurrentDir = DirectorioDe(db.Name)
+    For i = 0 To db.TableDefs.Count - 1
+        strConn = db.TableDefs(i).Connect
+        If Len(strConn) = 0 Then
+            GoTo SegiCTC
+        End If
+        strPre = IniDeConexion(strConn)
+        strDir = DirectorioDeConexion(strConn)
+        strFile = FileDeConexion(strConn)
+        rs.FindFirst "NombreTabla = '" & db.TableDefs(i).Name & "'"
+        If rs.NoMatch Then
+            rs.AddNew
+        Else
+            rs.Edit
+        End If
+        rs("NombreTabla") = db.TableDefs(i).Name
+        rs("PrefijoConexion") = strPre
+        rs("DirectorioDeConexion") = strDir 'db.TableDefs(i).Connect
+        rs("FicheroDeConexion") = strFile
+        If strDir = strCurrentDir Then
+            rs("DirectorioActual") = True
+        Else
+            rs("DirectorioActual") = False
+        End If
+        rs.Update
+        strMensaje = "Creando tabla de conexiones... " & j + 1
+        varReturn = SysCmd(acSysCmdSetStatus, strMensaje)
+        j = j + 1
+SegiCTC:
+    Next i
+    varReturn = SysCmd(acSysCmdClearStatus)
+Salir_CrearTablaConexiones:
+    Exit Function
+Error_CrearTablaConexiones:
+        Select Case Err
+            Case Else
+                MsgBox "Error nº: " & Err & " en CrearTablaConexiones" & vbCrLf & Err.Description
+        End Select
+        Resume Salir_CrearTablaConexiones
+        
+End Function
+
+
+
+Private Function FileDeConexion(strConnect As String) As String
+    Dim i As Integer, j As Integer, j2 As Integer
+    On Error GoTo Error_FileDeConexion
+    j = InStr(strConnect, ";")
+    j2 = InStr(j + 1, strConnect, "DATABASE=")
+    If j2 = 0 Then
+        j2 = j + 1
+    Else
+        j2 = j2 + 9
+    End If
+    FileDeConexion = FileDe(Mid(strConnect, j2))
+Salir_FileDeConexion:
+    Exit Function
+Error_FileDeConexion:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en FileDeConexion" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_FileDeConexion
+End Function
+
+
+Private Function FileDe(strFullPath As String) As String
+    Dim i As Integer
+    On Error GoTo Error_FileDe
+    For i = Len(strFullPath) To 1 Step -1
+        If Mid(strFullPath, i, 1) = "\" Then
+'            strElArchivo = Right(strFullPath, Len(strFullPath) - i)
+'            strElDirectorio = Left(strFullPath, i)
+            FileDe = Right(strFullPath, Len(strFullPath) - i)
+            Exit For
+        End If
+    Next i
+Salir_FileDe:
+    Exit Function
+Error_FileDe:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº: " & Err & " en FileDe" & vbCrLf & Err.Description
+    End Select
+    Resume Salir_FileDe
+End Function
+
+
+Public Function ReconectarTablasYaVinculadas() As Integer
+    Dim db As DAO.Database
+    Dim tdf As TableDef
+    Dim rs As Recordset
+    Dim strConnect As String, strPathNow As String
+    Dim strMensaje As String, varReturn As Variant
+    Dim i As Integer, j As Integer
+    On Error GoTo Error_ReconectarTablasYaVinculadas
+    Set db = CurrentDb
+    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset)
+    strPathNow = db.Name
+    strPathNow = DirectorioDe(strPathNow)
+    For i = 0 To db.TableDefs.Count - 1
+        Set tdf = db.TableDefs(i)
+        If Len(tdf.Connect) = 0 Then GoTo SiguienteTabla
+        rs.FindFirst "NombreTabla ='" & db.TableDefs(i).Name & "'"
+        If rs.NoMatch Then
+            MsgBox "La tabla " & db.TableDefs(i).Name & " no se encontró en la lista de conexiones"
+            GoTo SiguienteTabla
+        End If
+        If Len(rs("DirectorioDeConexion")) = 0 Then
+            GoTo SiguienteTabla
+        End If
+        If rs("DirectorioActual") = True Then
+            tdf.Connect = rs("PrefijoConexion") & strPathNow & rs("FicheroDeConexion")
+        Else
+            tdf.Connect = rs("PrefijoConexion") & rs("DirectorioDeConexion") & rs("FicheroDeConexion")
+        End If
+        tdf.RefreshLink
+        strMensaje = "Reconectando tablas vinculadas... " & j + 1
+        varReturn = SysCmd(acSysCmdSetStatus, strMensaje)
+        j = j + 1
+SiguienteTabla:
+    Next i
+Salir_ReconectarTablasYaVinculadas:
+    varReturn = SysCmd(acSysCmdClearStatus)
+    If j > 0 Then
+        MsgBox "Se reconectaron " & j & " tablas vinculadas"
+    End If
+    Exit Function
+Error_ReconectarTablasYaVinculadas:
+        Select Case Err
+            Case Else
+                MsgBox "Error nº: " & Err & " en ReconectarTablasYaVinculadas" & vbCrLf & Err.Description
+        End Select
+        Resume Salir_ReconectarTablasYaVinculadas
+        
+End Function

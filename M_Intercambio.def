@@ -1,0 +1,51 @@
+Option Compare Database   'Usar orden de base de datos en comparaciones de cadenas
+'Sub EncabezadoDePágina0_Format (Cancel As Integer, FormatCount As Integer)
+    
+    'If Not IsNull([Nro Documento]) Then
+
+        'If EsCopia Then
+            '[COPIA].Visible = True
+        'Else
+            '[COPIA].Visible = False
+       'End If
+
+        'Dim miBD As DAO.Database
+        'Dim RsTabla As Recordset
+
+        'Set miBD = DBengine.Workspaces(0).OpenDatabase(Bdatos, False, True)
+    
+        ' Leo los datos del Cliente
+        'Set RsTabla = currentdb.OpenRecordset("Clientes", dbopensnapshot)
+        ''RsTabla.Index = "CIF"
+
+        'RsTabla.FindFirst "=", [CIF Cliente]
+       ' If RsTabla.Nomatch Then
+            'MsgBox "El CIF Cliente " & [CIF Cliente] & " no existe en la tabla Clientes"
+        'Else
+            '[NombreC] = RsTabla![Nombre]
+            '[Nombre Comercial] = RsTabla![Nombre Comercial]
+        'End If
+
+        'RsTabla.Close
+    
+        ' Leo la dirección del Cliente
+        'Set RsTabla = currentdb.OpenRecordset("Direcciones Clientes", dbopensnapshot)
+        ''RsTabla.Index = "CIF-Nro"
+
+        'RsTabla.FindFirst "CIF =" & ConComillas([CIF Cliente]) & " AND [Nro de Dirección]='0'
+        'If RsTabla.Nomatch Then
+           ' MsgBox "El CIF Cliente " & [CIF Cliente] & " no existe en la tabla Clientes"
+        'Else
+            '[Dirección] = RsTabla![Dirección]
+            '[Código Postal] = RsTabla![Código Postal]
+            '[Población] = RsTabla![Población]
+            '[Provincia] = RsTabla![Provincia]
+       ' End If
+
+        'RsTabla.Close
+        
+        'miBD.Close
+        
+    'End If
+
+'End Sub

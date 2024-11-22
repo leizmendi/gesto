@@ -1,0 +1,30 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function BuscaAyuda(strBusqueda As String, Optional vValor As Variant = Null, Optional intAncho As Integer = 0) As Variant
+'Abre un formulario de búsqueda de registros
+   'On Error Resume Next
+    Dim strForm As String
+    Select Case intAncho
+        Case 0
+            strForm = "frmAyuda"
+        Case 1
+            strForm = "frmAyudaAncha"
+        Case 2
+            strForm = "frmAyudon"
+    End Select
+    DoCmd.OpenForm strForm, , , , , acDialog, strBusqueda & "¬" & NuloEs(vValor, "")
+
+    If Not IsOpenForm(strForm) Then
+        BuscaAyuda = Null
+        Exit Function
+    End If
+    If Forms(strForm).lst.ListIndex = -1 Then
+        BuscaAyuda = Null
+        GoTo SalirFuncion
+    End If
+    BuscaAyuda = Forms(strForm).lst
+SalirFuncion:
+    DoCmd.Close acForm, strForm
+End Function

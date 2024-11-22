@@ -1,0 +1,106 @@
+Option Compare Database
+Option Explicit
+
+Type tagOPENFILENAME
+   lStructSize As Long
+   hwndOwner As Long
+   hInstance As Long
+   lpstrFilter As String
+   lpstrCustomFilter As String
+   nMaxCustFilter As Long
+   nFilterIndex As Long
+   lpstrFile As String
+   nMaxFile As Long
+   lpstrFileTitle As String
+   nMaxFileTitle As Long
+   lpstrInitialDir As String
+   lpstrTitle As String
+   Flags As Long
+   nFileOffset As Integer
+   nFileExtension As Integer
+   lpstrDefExt As String
+   lCustData As Long
+   lpfnHook As Long
+   lpTemplateName As String
+End Type
+Declare Function apiGetOpenFileName Lib "comdlg32.dll" Alias "GetOpenFileNameA" (OPENFILENAME As tagOPENFILENAME) As Long
+'
+Dim OPENFILENAME As tagOPENFILENAME
+Public Const OFN_READONLY = &H1
+Public Const OFN_OVERWRITEPROMPT = &H2
+Public Const OFN_HIDEREADONLY = &H4
+Public Const OFN_NOCHANGEDIR = &H8
+Public Const OFN_SHOWHELP = &H10
+Public Const OFN_ENABLEHOOK = &H20
+Public Const OFN_ENABLETEMPLATE = &H40
+Public Const OFN_ENABLETEMPLATEHANDLE = &H80
+Public Const OFN_NOVALIDATE = &H100
+Public Const OFN_ALLOWMULTISELECT = &H200
+Public Const OFN_EXTENSIONDIFFERENT = &H400
+Public Const OFN_PATHMUSTEXIST = &H800
+Public Const OFN_FILEMUSTEXIST = &H1000
+Public Const OFN_CREATEPROMPT = &H2000
+Public Const OFN_SHAREAWARE = &H4000
+Public Const OFN_NOREADONLYRETURN = &H8000
+Public Const OFN_NOTESTFILECREATE = &H10000
+Public Const OFN_NONETWORKBUTTON = &H20000
+Public Const OFN_NOLONGNAMES = &H40000                      '  force no long names for 4.x modules
+Public Const OFN_EXPLORER = &H80000                         '  new look commdlg
+Public Const OFN_NODEREFERENCELINKS = &H100000
+Public Const OFN_LONGNAMES = &H200000                       '  force long names for 3.x modules
+
+Public Const OFN_SHAREFALLTHROUGH = 2
+Public Const OFN_SHARENOWARN = 1
+Public Const OFN_SHAREWARN = 0
+
+'
+'-------------------------------------------------------
+' Open Common Dialog Function
+'-------------------------------------------------------
+Function OpenCommDlg()
+Dim Message$, Filter$, FileName$, FileTitle$, DefExt$
+Dim Title$, szCurDir$, APIResults&
+'
+Filter$ = "Documentos WORD (doc)" & Chr$(0) & "*.DOC;" & Chr$(0) & _
+        "Todos los ficheros (*.*)" & Chr(0) & "*.*;" & Chr(0)
+Filter$ = Filter$ & Chr$(0)
+'
+FileName$ = Chr$(0) & Space$(255) & Chr$(0)
+FileTitle$ = Space$(255) & Chr$(0)
+'* Give the dialog a caption title.
+Title$ = "Seleccionar documento" & Chr$(0)
+'
+DefExt$ = "doc" & Chr$(0)   ' extensión por defecto
+szCurDir$ = CurDir$ & Chr$(0)  ' directorio por defecto, el actual
+'* Set up the data structure before you call the GetOpenFileName
+OPENFILENAME.lStructSize = Len(OPENFILENAME)
+'If the OpenFile Dialog box is linked to a form use this line.
+'It will pass the forms window handle.
+OPENFILENAME.hwndOwner = Screen.ActiveForm.hwnd
+'If the OpenFile Dialog box is not linked to any form use this line.
+'It will pass a null pointer.
+'OPENFILENAME.hwndOwner = 0&
+OPENFILENAME.lpstrFilter = Filter$
+OPENFILENAME.nFilterIndex = 1
+OPENFILENAME.lpstrFile = FileName$
+OPENFILENAME.nMaxFile = Len(FileName$)
+OPENFILENAME.lpstrFileTitle = FileTitle$
+OPENFILENAME.nMaxFileTitle = Len(FileTitle$)
+OPENFILENAME.lpstrTitle = Title$
+OPENFILENAME.Flags = OFN_FILEMUSTEXIST Or OFN_PATHMUSTEXIST Or OFN_FILEMUSTEXIST 'Or OFN_READONLY
+OPENFILENAME.lpstrDefExt = DefExt$
+OPENFILENAME.hInstance = 0
+OPENFILENAME.lpstrCustomFilter = Chr$(0)
+OPENFILENAME.nMaxCustFilter = 0
+OPENFILENAME.lpstrInitialDir = szCurDir$
+OPENFILENAME.nFileOffset = 0
+OPENFILENAME.nFileExtension = 0
+OPENFILENAME.lCustData = 0
+OPENFILENAME.lpfnHook = 0
+OPENFILENAME.lpTemplateName = 0
+If apiGetOpenFileName(OPENFILENAME) <> 0 Then
+    OpenCommDlg = Left$(OPENFILENAME.lpstrFile, InStr(OPENFILENAME.lpstrFile, Chr$(0)) - 1)
+Else
+    OpenCommDlg = ""
+End If
+End Function

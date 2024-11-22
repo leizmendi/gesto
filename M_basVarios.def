@@ -1,0 +1,369 @@
+Option Compare Database
+Option Explicit
+
+Public Function ConComillas(strCad As Variant) As String
+' Devuelve la misma cadena delimitada con comillas--> de Lorenzo---> "Lorenzo"
+    On Error GoTo Error_ConComillas
+    strCad = NuloEs(strCad, "")
+    Dim strComilla As String
+    strComilla = Chr(34)
+    ConComillas = strComilla & strCad & strComilla
+Salir_ConComillas:
+    Exit Function
+Error_ConComillas:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en ConComillas" & vbCrLf & Err.Description
+            Resume Salir_ConComillas
+    End Select
+
+End Function
+
+Public Function RecDerTop(ByVal str As Variant, intRecorteDerecha As Integer, intMaxLen As Integer) As Variant
+    On Error GoTo Error_RecDerTop
+    str = NuloEs(str, "")
+    Dim l As Long
+    l = Len(str)
+    If l <= intRecorteDerecha Then
+        RecDerTop = Null
+        Exit Function
+    End If
+    str = Left(str, l - intRecorteDerecha)
+    l = Len(str)
+    If intMaxLen = 0 Then
+    Else
+        If l > intMaxLen Then
+            str = Left(str, intMaxLen)
+        End If
+    End If
+    RecDerTop = str
+Salir_RecDerTop:
+    Exit Function
+Error_RecDerTop:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en RecDerTop" & vbCrLf & Err.Description
+            Resume Salir_RecDerTop
+            Resume Next
+    End Select
+End Function
+
+Public Function NuloEs(v As Variant, alter As Variant) As Variant
+    If IsNull(v) Then
+        NuloEs = alter
+    Else
+        NuloEs = v
+    End If
+End Function
+
+
+Public Function QuitaChar(strTxt As Variant, strQuita1 As String) As String
+    Dim i As Integer, strQ As String
+    strTxt = NuloEs(strTxt, "")
+    For i = 1 To Len(strTxt)
+        If Mid(strTxt, i, 1) <> strQuita1 Then
+            strQ = strQ & Mid(strTxt, i, 1)
+        End If
+    Next i
+    QuitaChar = strQ
+End Function
+
+Public Function CambiaTexto(strTxt As Variant, strQuita As String, strPon, Optional intRecursivo As Integer = True) As String
+    strTxt = NuloEs(strTxt, "")
+    Dim i As Integer, strQ As String, j As Integer
+    j = 1
+Ini:
+    i = InStr(j, strTxt, strQuita)
+    If i > 0 Then
+        If Not intRecursivo Then
+            strQ = strQ & Mid(strTxt, j, i - j) & strPon
+            j = i + Len(strQuita)
+        Else
+            strQ = strQ & Mid(strTxt, j, i - j)
+            strTxt = Mid(strTxt, j, i - j) & strPon & Mid(strTxt, i + Len(strQuita))
+            j = 1
+        End If
+        GoTo Ini
+    End If
+    strQ = strQ & Mid(strTxt, j)
+    If Not intRecursivo Then
+        CambiaTexto = strQ
+    Else
+        CambiaTexto = strTxt
+    End If
+End Function
+
+
+Public Function PruebaCambiaTexto()
+    Dim strTexto As String, strQuita As String, strPon As String
+    strTexto = InputBox("Texto")
+    strQuita = InputBox("Quita")
+    strPon = InputBox("Pon")
+    MsgBox CambiaTexto(strTexto, strQuita, strPon)
+End Function
+
+
+
+Public Function ExtraeLin(varTexto As Variant, intLin As Integer) As String
+    Dim i As Integer, j As Integer, intDesde As Integer, intHasta As Integer
+    Dim strTexto As String
+On Error GoTo Error_ExtraeLin
+    If IsNull(varTexto) Then
+        ExtraeLin = "!"
+        Exit Function
+    Else
+        strTexto = CStr(varTexto)
+    End If
+    For i = 1 To intLin
+        If j = 0 Then
+            intDesde = 1
+        Else
+            intDesde = j + 2
+        End If
+        j = InStr(intDesde, strTexto, vbCrLf)
+        If j = 0 Then
+            Exit For
+        End If
+        intHasta = j - 1
+    Next i
+    If j = 0 Then
+        If i = intLin Then
+            If Len(strTexto) > intDesde Then
+                ExtraeLin = Mid(strTexto, intDesde)
+            Else
+                ExtraeLin = ""
+            End If
+        Else
+            ExtraeLin = ""
+        End If
+    Else
+        ExtraeLin = Mid(strTexto, intDesde, intHasta - intDesde + 1)
+    End If
+
+Salir_ExtraeLin:
+    Exit Function
+Error_ExtraeLin:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & vbCrLf & Err.Description & vbCrLf & "En ExtraeLin"
+            
+    End Select
+    
+    Resume Salir_ExtraeLin
+
+End Function
+
+Public Function Llena(strTexto As Variant, intHasta As Integer) As String
+    strTexto = NuloEs(strTexto, "")
+    If Len(strTexto) >= intHasta Then
+        Llena = Left(strTexto, intHasta)
+    Else
+        Llena = strTexto & Space(intHasta - Len(strTexto))
+    End If
+End Function
+Public Function LlenaIzq(strTexto As Variant, intHasta As Integer) As String
+    strTexto = NuloEs(strTexto, "")
+    If Len(strTexto) >= intHasta Then
+        LlenaIzq = Right(strTexto, intHasta)
+    Else
+        LlenaIzq = Space(intHasta - Len(strTexto)) & strTexto
+    End If
+End Function
+Public Function Centra(strTexto As Variant, intAncho As Integer) As String
+    strTexto = NuloEs(strTexto, "")
+    If Len(strTexto) >= intAncho Then
+        Centra = Left(strTexto, intAncho)
+    Else
+        Centra = Llena(Space((intAncho - Len(strTexto)) \ 2) & strTexto, intAncho)
+    End If
+End Function
+
+Public Function LlenaChar(str1 As Variant, intCant As Integer) As String
+    str1 = NuloEs(str1, "")
+    Dim i As Integer
+    If Len(str1) < 1 Then
+        LlenaChar = ""
+        Exit Function
+    End If
+    For i = 1 To intCant
+        LlenaChar = LlenaChar & Left(str1, 1)
+    Next i
+End Function
+
+
+Public Function LlenaIzqChar(strTexto As Variant, intHasta As Integer, str1 As String) As String
+    strTexto = NuloEs(strTexto, "")
+    If Len(strTexto) >= intHasta Then
+        LlenaIzqChar = Right(strTexto, intHasta)
+    Else
+        LlenaIzqChar = LlenaChar(str1, intHasta - Len(strTexto)) & strTexto
+    End If
+End Function
+
+Public Sub ImprimirTodosLosChar(bytDesde As Byte)
+'Para ver la pag. de códigos de la impresora
+    Dim strgLin As String
+    Dim i As Integer
+    For i = bytDesde To 255
+        strgLin = strgLin & Format(i, "000") & "-" & Chr(i) & ", "
+    Next i
+    Open "C:\lpt1" For Output As #1
+    Print #1, strgLin
+    Close
+End Sub
+
+
+Public Function LineasDeStr(varTexto As Variant) As Integer
+    Dim i As Integer, j As Integer, intLin As Integer
+    Dim strTexto As String
+On Error GoTo Error_LineasDeStr
+    If IsNull(varTexto) Then
+        LineasDeStr = 0
+        Exit Function
+    Else
+        strTexto = CStr(varTexto)
+    End If
+    j = 1
+    While True
+        i = InStr(j, strTexto, vbCrLf)
+        intLin = intLin + 1
+        If i = 0 Then
+            GoTo Sigue
+        Else
+            j = i + 1
+        End If
+    Wend
+Sigue:
+    LineasDeStr = intLin
+
+Salir_LineasDeStr:
+    Exit Function
+Error_LineasDeStr:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & vbCrLf & Err.Description & vbCrLf & "En LineasDeStr"
+            
+    End Select
+    
+    Resume Salir_LineasDeStr
+
+End Function
+
+Public Sub PrimerEspacioDcha(strTexto As String, intStart As Integer, ByRef intAncho As Integer)
+    'Se le pasa una cadena y a partir de que carácter se examina intStart) y el ancho máximo de
+    'la línea, en intAncho devuelve el primer espacio que encuentra para saltar de línea
+    'Si no encuentra espacio, devuelve el mismo intAncho
+    On Error GoTo Error_PrimerEspacioDcha
+    Dim i As Integer
+    i = intStart + intAncho
+    If Len(strTexto) <= i Then Exit Sub
+    While i > intStart
+        If Mid(strTexto, i, 1) = " " Then
+            intAncho = i
+            Exit Sub
+        End If
+        i = i - 1
+    Wend
+Salir_PrimerEspacioDcha:
+    Exit Sub
+Error_PrimerEspacioDcha:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en PrimerEspacioDcha" & vbCrLf & Err.Description
+            Resume Salir_PrimerEspacioDcha
+    End Select
+
+End Sub
+
+Public Function X100()
+'Sirve para controles de % que si se introduce 16, coja 16% y no 1600%
+    On Error Resume Next
+    If Screen.ActiveControl.value > 1 Then
+        Screen.ActiveControl.value = Screen.ActiveControl.value / 100
+        Call X100
+    End If
+End Function
+
+Public Function AMayus()
+    On Error Resume Next
+    Screen.ActiveControl = UCase(Screen.ActiveControl)
+End Function
+
+Public Function Redondea(valor As Variant, intDecimales As Integer) As Variant
+    If Not IsNumeric(valor) Then
+        Redondea = valor
+        Exit Function
+    End If
+    Redondea = CLng(valor * (10 ^ intDecimales)) / (10 ^ intDecimales)
+End Function
+
+Public Function RedondeaMe(intDecimales As Integer)
+    Dim ctl As Control
+    Set ctl = Screen.ActiveControl
+    ctl.value = Redondea(ctl.value, intDecimales)
+End Function
+
+
+
+
+Public Function FechaM_D_YtoSQL(sMM_DD_YYY As String) As String
+    'Transforma la cadena #12/31/2024# en '20241231'
+    On Error GoTo HandleError
+    Dim sR As String
+    sR = sMM_DD_YYY
+    sR = "'" & Mid(sR, 8, 4) & Mid(sR, 2, 2) & Mid(sR, 5, 2) & "'"
+    FechaM_D_YtoSQL = sR
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Function ReplaceFechasToSQL(cadena As String) As String
+    On Error GoTo HandleError
+    'Busca en la cadena sSQLlas apariciones de #mm/dd/yyyy# y las reemplaza por 'yyyymmdd'
+    Dim regEx As Object
+    Dim matches As Object
+    Dim match As Object
+    Dim fechaOriginal As String
+    Dim fechaFormateada As String
+    Dim mm As String, dd As String, yyyy As String
+    
+    ' Crear el objeto RegExp
+    Set regEx = CreateObject("VBScript.RegExp")
+    
+    ' Definir el patrón para encontrar fechas en el formato #mm/dd/yyyy#
+    regEx.Pattern = "#(\d{2})/(\d{2})/(\d{4})#"
+    regEx.Global = True ' Permitir múltiples coincidencias
+    
+    ' Buscar todas las coincidencias
+    Set matches = regEx.Execute(cadena)
+    
+    ' Iterar sobre todas las coincidencias y reemplazar
+    For Each match In matches
+        ' Extraer el valor de la coincidencia (fecha en formato #mm/dd/yyyy#)
+        fechaOriginal = match.value
+        
+        ' Extraer mm, dd, yyyy usando grupos de captura
+        mm = regEx.Replace(fechaOriginal, "$1")
+        dd = regEx.Replace(fechaOriginal, "$2")
+        yyyy = regEx.Replace(fechaOriginal, "$3")
+        
+        ' Formatear la fecha en 'yyyymmdd'
+        fechaFormateada = "'" & yyyy & mm & dd & "'"
+        
+        ' Reemplazar la fecha original en la cadena
+    
+        cadena = Replace(cadena, fechaOriginal, fechaFormateada)
+    Next match
+    
+    ' Devolver la cadena modificada
+    ReplaceFechasToSQL = cadena
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+    
+End Function

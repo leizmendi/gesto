@@ -1,0 +1,63 @@
+Option Compare Database   'Use database order for string comparisons
+Option Explicit
+
+' From Access 97 Developer's Handbook
+' by Litwin, Getz, and Gilbert (Sybex)
+' Copyright 1997.  All rights reserved.
+
+Const adhcCalendarForm = "frmCalendar"
+
+Function adhDoCalendar(Optional varPassedDate As Variant) As Variant
+    '
+    ' This is the public entry point.
+    ' If the passed in date is missing (as it will
+    ' be if someone just opens the Calendar form
+    ' raw), start on the current day.
+    ' Otherwise, start with the date that is passed in.
+    
+    ' From Access 97 Developer's Handbook
+    ' by Litwin, Getz, and Gilbert (Sybex)
+    ' Copyright 1997.  All rights reserved.
+    '
+    Dim varStartDate As Variant
+
+    ' If they passed a value at all, attempt to
+    ' use it as the start date.
+    varStartDate = IIf(IsMissing(varPassedDate), _
+     Date, varPassedDate)
+    ' OK, so they passed a value that wasn't a date.
+    ' Just use today's date in that case, too.
+    If Not IsDate(varStartDate) Then varStartDate = Date
+    DoCmd.OpenForm FormName:=adhcCalendarForm, _
+     WindowMode:=acDialog, OpenArgs:=varStartDate
+
+    ' You won't get here until the form is
+    ' closed or hidden.
+    '
+    ' If the form is still loaded, then get the
+    ' final chosen date from the form.  If it isn't,
+    ' return Null.
+    If isOpen(adhcCalendarForm) Then
+        adhDoCalendar = Forms(adhcCalendarForm).value
+        DoCmd.Close acForm, adhcCalendarForm
+    Else
+        adhDoCalendar = Null
+    End If
+End Function
+
+Private Function isOpen(strName As String, _
+ Optional intObjectType As Integer = acForm)
+    ' Returns True if strName is open, False otherwise.
+    ' Assume the caller wants to know about a form.
+    isOpen = (SysCmd(acSysCmdGetObjectState, _
+     intObjectType, strName) <> 0)
+End Function
+
+
+
+Public Function DimeFecha(ctl As Control) As Variant
+    Dim dtF As Date, v As Variant
+    If IsDate(ctl.value) Then dtF = ctl.value
+    v = adhDoCalendar(dtF)
+    ctl.value = CDate(v)
+End Function

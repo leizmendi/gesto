@@ -1,0 +1,120 @@
+Option Compare Database
+Option Explicit
+
+Public Function BuscarGeneral(Optional intRepetir As Integer = False, Optional intSalto As Integer = False)
+    Static strBuscar As String
+    Dim strBuscar2 As String
+'    Dim strControl As String, intSelStart As Integer, intSelLength As Integer, lngAP As Single
+'    Dim rs As Recordset, ctl As Control
+'    Static intBottom As Integer
+    On Error GoTo Error_BuscarGeneral
+'    Set rs = Screen.ActiveForm.RecordsetClone
+'    rs.Bookmark = Screen.ActiveForm.Bookmark
+'    lngAP = rs.AbsolutePosition
+'    Set ctl = Screen.ActiveControl
+'    strControl = ctl.Name
+'    intSelStart = ctl.SelStart
+'    intSelLength = ctl.SelLength
+    Dim strOpenArgs As String
+    If intSalto Then GoTo Salto
+    Select Case Screen.ActiveForm.Name
+        Case "frmClientes"
+            DoCmd.OpenForm "frmBuscarCliente", , , , , acDialog, "frmClientes"
+            Exit Function
+        Case "Facturas"
+            DoCmd.OpenForm "frmBuscarFactura", , , , , acDialog
+            Exit Function
+        Case "frmPresupuestos"
+            DoCmd.OpenForm "frmBuscarPresupuesto", , , , , acDialog
+            Exit Function
+        Case "frmTPV"
+            DoCmd.OpenForm "frmBuscarTicket", , , , , acDialog
+            Exit Function
+    End Select
+Salto:
+    If intRepetir = False Then
+        strBuscar2 = InputBox("Introduzca el texto que desea buscar..." & vbCrLf & vbCrLf & "(Para repetir búsqueda, puede pulsar F3)", "Buscar", strBuscar)
+        If strBuscar2 = "" Then Exit Function
+    Else
+        strBuscar2 = strBuscar
+    End If
+    
+'    If strBuscar2 = strBuscar And intBottom = False Then
+    If strBuscar2 = strBuscar Then
+        DoCmd.FindRecord ConAcentos(strBuscar2), acAnywhere, , acDown, , acAll, False
+    Else
+        DoCmd.FindRecord ConAcentos(strBuscar2), acAnywhere, , acSearchAll, , acAll, True
+    End If
+    strBuscar = strBuscar2
+    
+'    If intBottom = True Then
+'        intBottom = False
+'        Exit Function
+'    End If
+'    rs.Bookmark = Screen.ActiveForm.Bookmark
+'    If lngAP = rs.AbsolutePosition Then
+'        Set ctl = Screen.ActiveControl
+'        If strControl = ctl.Name Then
+'            If intSelStart = ctl.SelStart Then
+'                If intSelLength = ctl.SelLength Then
+'                    MsgBox "Se llegó al final de los registros"
+'                    intBottom = True
+ '               End If
+'            End If
+'        End If
+'    End If'
+
+Salir_BuscarGeneral:
+    Exit Function
+Error_BuscarGeneral:
+    Select Case Err
+'        Case 7951 ' El formulario activo no tiene recordset
+'            Set ctl = Screen.ActiveControl
+        Case Else
+            MsgBox "Error nº " & Err & " En BuscarGeneral" & vbCrLf & Err.Description
+            Resume Salir_BuscarGeneral
+    End Select
+End Function
+
+Function ConAcentos(strX As Variant) As Variant
+Const VOCALES = "AÁÀÂÄaEÉÈÊËeIÍÌÎÏiOÓÒÔÖ0UÚÙÛÜu"
+Const z = 6 'posibilidades
+'las minúsculas no son más que para que cada letra tenga adjudicados seis lugares, para facilitar el cálclo posterior
+    If IsNull(strX) Then
+        ConAcentos = strX
+        Exit Function
+    End If
+    Dim i As Integer, intEsVocal As Integer, j As Integer, strResult As String
+    strResult = ""
+    For i = 1 To Len(strX)
+        intEsVocal = InStr(1, VOCALES, Mid(strX, i, 1), 1)
+        If intEsVocal > 0 Then
+            j = (intEsVocal - 1) \ z ' División entera, da 0 para las Aes, 1 para las Es....
+            strResult = strResult & "[" & Mid(VOCALES, (j * z) + 1, z) & "]"
+        Else
+            strResult = strResult & Mid(strX, i, 1)
+        End If
+    Next
+    ConAcentos = strResult
+End Function
+
+Public Sub AbrirfrmListasVarias(strOpenArgs As String)
+    On Error GoTo Error_AbrirfrmListasVarias
+    If IsOpenForm("frmListasVarias") Then
+        If Application.Forms("frmListasVarias").OpenArgs = strOpenArgs Then
+            Application.Forms("frmListasVarias").Visible = True
+            Exit Sub
+        Else
+            DoCmd.Close acForm, "frmListasVarias"
+        End If
+    End If
+    DoCmd.OpenForm "frmListasVarias", , , , , acDialog, strOpenArgs
+Salir_AbrirfrmListasVarias:
+    Exit Sub
+Error_AbrirfrmListasVarias:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & vbCrLf & Err.Description & vbCrLf & "En AbrirfrmListasVarias"
+    End Select
+    Resume Salir_AbrirfrmListasVarias
+End Sub
