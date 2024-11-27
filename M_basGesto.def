@@ -1,0 +1,46 @@
+Option Compare Database
+Option Explicit
+
+Public Function Salir()
+    On Error GoTo HandleError
+    Dim sFormName As String, sReportName As String, iR As Integer
+    If Not Screen.ActiveForm Is Nothing Then
+        sFormName = Screen.ActiveForm.Name
+    ElseIf Not Screen.ActiveReport Is Nothing Then
+        sReportName = Screen.ActiveReport.Name
+    End If
+    If sFormName <> "" Then
+        If sFormName = "Inicio" Then
+            iR = MsgBox("Cerrar Programa", vbQuestion + vbOKCancel, "Gesto")
+            If iR = vbOK Then DoCmd.Quit
+            GoTo HandleExit
+        End If
+        DoCmd.Close acForm, sFormName
+        GoTo HandleExit
+    End If
+    If sReportName <> "" Then
+        DoCmd.Close acReport, sReportName
+    End If
+            
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Public Function RowSourceMeses(Optional bIncluirTodos As Boolean = True) As String
+    RowSourceMeses = IIf(bIncluirTodos, "0;Todos;", "") _
+                    & "1;Enero;" _
+                    & "2;Febrero;" _
+                    & "3;Marzo;" _
+                    & "4;Abril;" _
+                    & "5;Mayo;" _
+                    & "6;Junio;" _
+                    & "7;Julio;" _
+                    & "8;Agosto;" _
+                    & "9;Septiembre;" _
+                    & "10;Octubre;" _
+                    & "11;Noviembre;" _
+                    & "12;Diciembre"
+End Function

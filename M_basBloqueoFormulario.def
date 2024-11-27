@@ -59,7 +59,7 @@ Public Sub BloqueoFormulario(frm As Form, Optional ByRef intLock As Integer = 22
                 '.........................................
                 ctl.Form.DatasheetBackColor = lngColor
                 ctl.Form.DatasheetGridlinesColor = lngColor2
-'                ctl.Form.AllowAdditions = Not intLock
+                ctl.Form.AllowAdditions = Not intLock
                 ctl.Form.AllowDeletions = Not intLock
                 ctl.Form.AllowEdits = Not intLock
                 BloqueoFormulario ctl.Form, intLock, EsLock2

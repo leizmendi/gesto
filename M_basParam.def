@@ -1,25 +1,33 @@
 Option Compare Database
 Option Explicit
     Dim grsC As Recordset
-    Dim grsP As Recordset
 
-    Global Const TC_CmToPoints As Integer = 568 ' factor Centímetros-->Puntos
-
-Public Sub CargarParam(frm As Form)
-    Dim ctl As Control, v As Variant
-    Set grsC = CurrentDb.OpenRecordset("cfgParam")
-    Set grsP = CurrentDb.OpenRecordset("pstParam")
+Public Sub CargarParam(frm As Form, Optional strPrefijo As String = "")
+    Dim ctl As Control, v As Variant, strParam As String, strParamUS As String
+    Dim sUserName As String, bUserParam As Boolean
+    sUserName = GetUserName
+    Set grsC = CurrentDb.OpenRecordset("SELECT * FROM cfgParam WHERE NP Like '" & strPrefijo & "*'", dbOpenSnapshot)
     On Error GoTo Error_CargarParam
     For Each ctl In frm.Controls
         If InStr(ctl.Tag, "param") = 0 Then GoTo SiguienteControl
-        If DameVP(ctl.Name, v) = True Then
-            ctl.value = v
+        strParam = strPrefijo & ctl.Name
+        If InStr(ctl.Tag, "paramUS") = 0 Then
+            strParamUS = ""
+            If DameVP(strParam, v) = True Then
+                ctl.value = v
+            End If
+        Else
+            strParamUS = strParam & "_" & sUserName
+            If DameVP(strParamUS, v) = True Then
+                ctl.value = v
+            ElseIf DameVP(strParam, v) = True Then
+                ctl.value = v
+            End If
         End If
 SiguienteControl:
     Next ctl
 Salir_CargarParam:
     Set grsC = Nothing
-    Set grsP = Nothing
     Exit Sub
 Error_CargarParam:
     Select Case Err
@@ -27,26 +35,33 @@ Error_CargarParam:
             MsgBox "error nº " & Err & " en CargarParam" & vbCrLf & Err.Description
             Resume Salir_CargarParam
             Resume Next
-            
     End Select
 
 End Sub
 
-Public Sub GrabarParam(frm As Form)
+Public Sub GrabarParam(frm As Form, Optional strPrefijo As String = "")
     On Error GoTo Error_GrabarParam
-    Dim ctl As Control
-    Set grsC = CurrentDb.OpenRecordset("cfgParam")
-    Set grsP = CurrentDb.OpenRecordset("pstParam")
+    Dim ctl As Control, strParam As String, strParamUS As String, vVP, intTipoDato As Integer, strTipoDato As String
+    Dim sUserName As String, bUserParam As Boolean, bRowSourceParam As Boolean
+    sUserName = GetUserName
     For Each ctl In frm.Controls
         If InStr(ctl.Tag, "param") = 0 Then GoTo SiguienteControl
-        If Not PonVP(ctl.Name, ctl.value) Then
-            MsgBox "No se pudo grabar el Parámetro " & ctl.Name
+        strParam = strPrefijo & ctl.Name
+        bUserParam = InStr(ctl.Tag, "paramUS") > 0
+        vVP = ctl.value
+        If Not bUserParam Then
+            strTipoDato = Mid(ctl.Tag, 6, 3)
+        Else
+            strTipoDato = Mid(ctl.Tag, 8, 3)
+            strParam = strParam & "_" & sUserName
+        End If
+        intTipoDato = CInt(strTipoDato)
+        If Not PonVP(strParam, vVP, intTipoDato) Then
+            MsgBox "No se pudo grabar el Parámetro " & strParam
         End If
 SiguienteControl:
     Next ctl
 Salir_GrabarParam:
-    Set grsC = Nothing
-    Set grsP = Nothing
     Exit Sub
 Error_GrabarParam:
     Select Case Err
@@ -56,41 +71,59 @@ Error_GrabarParam:
     End Select
 End Sub
 
-Public Sub ComprobarParam(frm As Form, Cancel As Integer)
+Public Sub ComprobarParam(frm As Form, Cancel As Integer, Optional intPreguntar As Integer = True, Optional strPrefijo As String = "")
     On Error GoTo Error_ComprobarParam
-    Dim ctl As Control, intResp As Integer, v As Variant
-    Dim i As Integer, intTipoDato As Integer
-    Set grsC = CurrentDb.OpenRecordset("cfgParam")
-    Set grsP = CurrentDb.OpenRecordset("pstParam")
+    Dim ctl As Control, intResp As Integer, v As Variant, vNew As Variant
+    Dim i As Integer, intTipoDato As Integer, strParam As String, iParamLen As Integer
+    Dim sUserName As String, bUserParam As Boolean
+    sUserName = GetUserName
+    Set grsC = CurrentDb.OpenRecordset("cfgParam", dbOpenDynaset, dbSeeChanges)
     For Each ctl In frm.Controls
         If InStr(ctl.Tag, "param") = 0 Then GoTo SiguienteControl
-        If DameVP(ctl.Name, v) = True Then
-            If ctl.value = v Or (IsNull(ctl.value) And IsNull(v)) Then
+        bUserParam = InStr(ctl.Tag, "paramUS") > 0
+        If Not bUserParam Then
+            strParam = strPrefijo & ctl.Name
+            iParamLen = 5
+        Else
+            strParam = strPrefijo & ctl.Name & "_" & sUserName
+            iParamLen = 7
+        End If
+        If DameVP(strParam, v) = True Then
+            vNew = ctl.value
+            If vNew = v Or (IsNull(vNew) And IsNull(v)) Then
             Else
-                intResp = MsgBox("¿Grabar cambios?", vbDefaultButton1 + vbYesNoCancel + vbQuestion)
+                If intPreguntar Then
+                    intResp = MsgBox("¿Grabar cambios?", vbDefaultButton1 + vbYesNoCancel + vbQuestion)
+                Else
+                    intResp = vbYes
+                End If
                 Select Case intResp
                     Case vbYes
-                        GrabarParam frm
+                        GrabarParam frm, strPrefijo
                     Case vbNo
                     Case vbCancel
                         Cancel = True
                 End Select
-                Exit Sub
+                GoTo Salir_ComprobarParam
             End If
         Else
             i = InStr(ctl.Tag, "param")
-            If Len(ctl.Tag) < i + 7 Then
+            If Len(ctl.Tag) < i + iParamLen + 2 Then
                 intTipoDato = 10
             Else
-                intTipoDato = CInt(Mid(ctl.Tag, i + 5, 3))
+                If IsNumeric(Mid(ctl.Tag, i + iParamLen, 3)) Then
+                    intTipoDato = CInt(Mid(ctl.Tag, i + iParamLen, 3))
+                Else
+                    intTipoDato = 10
+                End If
             End If
-            PonValorParam ctl.Name, ctl.value, intTipoDato
+            'PonValorParam strParam, ctl.value, intTipoDato
+            PonVP strParam, ctl.value, intTipoDato
         End If
 SiguienteControl:
     Next ctl
 Salir_ComprobarParam:
     Set grsC = Nothing
-    Set grsP = Nothing
     Exit Sub
 Error_ComprobarParam:
     Select Case Err
@@ -101,63 +134,95 @@ Error_ComprobarParam:
 
 End Sub
 
-Private Function DameVP(strNP As String, vVP As Variant) As Integer
-    'Pone en vVP el valor del parámetro encontrado, si el parámetro no existe Devuelve False, si si true
-    On Error GoTo Error_DameVP
-    Dim rs As Recordset
-    If strNP Like "Puesto*" Then
-        Set rs = grsP
-    Else
-        Set rs = grsC
-    End If
-    
-    rs.FindFirst "NP = '" & strNP & "'"
-    If rs.NoMatch Then
-        DameVP = False
-        Exit Function
-    End If
-    Select Case rs("TipoDato")
-        Case 1 'boolean
-            vVP = rs("VPbool")
-        Case 2 'byte
-            vVP = rs("VPlng")
-        Case 3 'integer
-            vVP = rs("VPlng")
-        Case 4 'long
-            vVP = rs("VPlng")
-        Case 5 'currency
-            vVP = rs("VPcur")
-        Case 6 'single
-            vVP = rs("VPcur")
-        Case 7 'double
-            vVP = rs("VPcur")
-        Case 8 'date
-            vVP = rs("VPfecha")
-        Case 12 'memo
-            vVP = rs("VPmemo")
-        Case Else 'text
-            vVP = rs("VP")
-    End Select
+Public Function DameVP(strNP As String, vVP As Variant) As Boolean
+    On Error GoTo HandleError
+    Dim sSQL As String, vValue As Variant
+    sSQL = "SELECT dbo.GetParam('" & strNP & "')"
+    vVP = Q_p_t(sSQL, gsc(), True)(0)
     DameVP = True
-Salir_DameVP:
+HandleExit:
     Exit Function
-Error_DameVP:
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Public Function GetParam(strNP As String, Optional bUser As Boolean = False _
+                         , Optional bCloseRecordSet As Boolean = True)
+    On Error GoTo Error_GetParam
+    Dim strParam As String, vVP
+    strParam = strNP & IIf(bUser, "_" & GetUserName(), "")
+    
+    If DameVP(strParam, vVP) Then
+        GetParam = vVP
+    End If
+Salir_GetParam:
+    Exit Function
+Error_GetParam:
     Select Case Err
         Case Else
-            MsgBox "error nº " & Err & " en DameVP" & vbCrLf & Err.Description
-            Resume Salir_DameVP
+            MsgBox "error nº " & Err & " en GetParam" & vbCrLf & Err.Description
+            
+            Resume Salir_GetParam
             Resume Next
     End Select
 End Function
 
-
+Public Function SetParam(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10, Optional intUser As Integer = False _
+                         , Optional bCloseRecordSet As Boolean = True) As Integer
+    On Error GoTo Error_GetParam
+    Dim strParam As String
+    strParam = strNP & IIf(intUser, "_" & GetUserName(), "")
+    SetParam = PonVP(strParam, vVP, intTipoDato)
+Salir_GetParam:
+    Exit Function
+Error_GetParam:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en GetParam" & vbCrLf & Err.Description
+            Resume Salir_GetParam
+            Resume Next
+    End Select
+End Function
 
 Private Function PonVP(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10) As Integer
+    On Error GoTo HandleError
+    Dim sSQL As String
+    sSQL = "EXEC SetParam @ParamName = '" & strNP & "', @Value = " & DimeValue(vVP, intTipoDato) & ", @TipoDato = " & intTipoDato & ";"
+    Q_p_t sSQL, gsc(), False
+    PonVP = True
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Private Function DimeValue(vValue As Variant, iTipo As Integer) As String
+    If IsNull(vValue) Then
+        DimeValue = "Null"
+    Else
+        Select Case iTipo
+            Case 1
+                DimeValue = IIf(vValue, 1, 0)
+            Case 2, 3, 4
+                DimeValue = vValue
+            Case 5, 6, 7
+                DimeValue = ComaPunto(CStr(vValue))
+            Case 8
+                DimeValue = ConComillas(Format(CDate(vValue), "yyy-mm-dd"), True)
+            Case Else
+                DimeValue = ConComillas(CStr(vValue), True)
+        End Select
+    End If
+End Function
+
+Private Function PonVP_OLD(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10, Optional bUserParam As Boolean = True) As Integer
     'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
     On Error GoTo Error_PonVP
     Dim rs As Recordset
-    If strNP Like "Puesto*" Then
-        Set rs = grsP
+    If bUserParam Then
+        Set rs = grsC
     Else
         Set rs = grsC
     End If
@@ -168,6 +233,71 @@ Private Function PonVP(strNP As String, vVP As Variant, Optional intTipoDato As 
         rs("TipoDato") = intTipoDato
     Else
         rs.Edit
+    End If
+    Select Case rs("TipoDato")
+        Case 10 'text
+            rs("VP") = vVP
+        Case 1 'boolean
+            rs("VPbool") = vVP
+        Case 2 'byte
+            rs("VPlng") = vVP
+        Case 3 'integer
+            rs("VPlng") = vVP
+        Case 4 'long
+            rs("VPlng") = vVP
+        Case 5 'currency
+            rs("VPcur") = vVP
+        Case 6 'single
+            rs("VPcur") = vVP
+        Case 7 'double
+            rs("VPcur") = vVP
+        Case 8 'date
+            rs("VPfecha") = vVP
+        Case 12 'memo
+            rs("VPmemo") = IIf(vVP = "", Null, vVP)
+        Case Else 'text
+            rs("VP") = vVP
+    End Select
+'    rs("FModificado") = Now()
+    rs.Update
+    PonVP_OLD = True
+Salir_PonVP:
+    Exit Function
+Error_PonVP:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en PonVP" & vbCrLf & Err.Description
+            Resume Salir_PonVP
+            Resume Next
+    End Select
+End Function
+
+
+
+Public Function PonValorParam_old(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10, Optional intMsg As Integer = True, Optional intForzarTipoDato As Integer = False) As Integer
+    'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
+    On Error GoTo Error_PonValorParam
+    Dim db As DAO.Database, rs As Recordset, strTable As String ', strFile As String
+    'If strNP Like "Puesto*" Then
+    '    strTable = "pstParam"
+    '    strFile = "R4PST.mdb"
+    'Else
+        strTable = "cfgParam"
+        'strFile = "R4CFG.mdb"
+    'End If
+    Set db = CurrentDb
+    Set rs = db.OpenRecordset(strTable, dbOpenDynaset, dbSeeChanges)
+    'Set rs = CurrentDb.OpenRecordset(strTable, dbOpenDynaset,dbseechanges)
+    rs.FindFirst "NP = '" & strNP & "'"
+    If rs.NoMatch Then
+        If intMsg Then MsgBox "Se va a añadir Parámetro " & strNP
+        rs.AddNew
+        rs("NP") = strNP
+        rs("TipoDato") = intTipoDato
+    Else
+        rs.Edit
+        If intForzarTipoDato = True Then rs("TipoDato") = intTipoDato
+
     End If
     Select Case rs("TipoDato")
         Case 1 'boolean
@@ -191,34 +321,120 @@ Private Function PonVP(strNP As String, vVP As Variant, Optional intTipoDato As 
         Case Else 'text
             rs("VP") = vVP
     End Select
+    rs("FModificado") = Now()
     rs.Update
-    PonVP = True
-Salir_PonVP:
+    PonValorParam_old = True
+Salir_PonValorParam:
     Exit Function
-Error_PonVP:
+Error_PonValorParam:
     Select Case Err
         Case Else
-            MsgBox "error nº " & Err & " en PonVP" & vbCrLf & Err.Description
-            Resume Salir_PonVP
+            MsgBox "error nº " & Err & " en PonValorParam" & vbCrLf & Err.Description
+            Resume Salir_PonValorParam
             Resume Next
     End Select
 End Function
 
-
-
-Public Function DameValorParam(strNP As String) As Variant
-    'Devuelve el valor del parámetro encontrado, si el parámetro no existe Devuelve ""
-    On Error GoTo Error_DameValorParam
-    Dim rs As Recordset, vVP As Variant, strTable As String
-    If strNP Like "Puesto*" Then
-        strTable = "pstParam"
-    Else
-        strTable = "cfgParam"
+Public Function PonValorParamAC(Optional intTipoDato As Integer = 10, Optional intForzarTipoDato As Integer = False) As Integer
+    'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
+    'Pasa El nombre y Calor del Control Activo a PonValorParam
+    On Error GoTo Error_PonValorParamAC
+    Dim strNP As String, vVP As Variant
+    Dim ctl As Control, i As Integer, v As Variant
+    Dim intUser As Integer
+    Set ctl = Screen.ActiveControl
+    strNP = ctl.Name
+    vVP = ctl.value
+    i = InStr(ctl.Tag, "param")
+    If i > 0 Then
+        intUser = InStr(ctl.Tag, "paramUS") > 0
+        If Len(ctl.Tag) >= i + 7 Then
+            v = Mid(ctl.Tag, i + 5, 3)
+            On Error Resume Next
+            intTipoDato = CInt(v)
+            On Error GoTo Error_PonValorParamAC
+        End If
     End If
-    Set rs = CurrentDb.OpenRecordset(strTable, dbOpenSnapshot)
+    'PonValorParam strNP, vVP, intTipoDato, , intForzarTipoDato
+    SetParam strNP, vVP, intTipoDato, intUser
+    PonValorParamAC = True
+Salir_PonValorParamAC:
+    Exit Function
+Error_PonValorParamAC:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en PonValorParamAC" & vbCrLf & Err.Description
+            Resume Salir_PonValorParamAC
+            Resume Next
+    End Select
+End Function
+
+Public Function PonValorParamRemoto(strMDB As String, strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10, Optional intMensaje As Integer = True) As Integer
+    'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
+    On Error GoTo Error_PonValorParamRemoto
+    Dim rs As Recordset
+    Dim db As DAO.Database
+    Set db = OpenDatabase(strMDB)
+    If strNP Like "Puesto*" Then
+        Set rs = db.OpenRecordset("pstParam", dbOpenDynaset, dbSeeChanges)
+    Else
+        Set rs = db.OpenRecordset("cfgParam", dbOpenDynaset, dbSeeChanges)
+    End If
     rs.FindFirst "NP = '" & strNP & "'"
     If rs.NoMatch Then
-        DameValorParam = Null
+        If intMensaje Then MsgBox "Se va a añadir Parámetro " & strNP & " en base: " & strMDB
+        rs.AddNew
+        rs("NP") = strNP
+        rs("TipoDato") = intTipoDato
+    Else
+        rs.Edit
+    End If
+    Select Case rs("TipoDato")
+        Case 10 'text
+            rs("VP") = vVP
+        Case 1 'boolean
+            rs("VPbool") = vVP
+        Case 2 'byte
+            rs("VPlng") = vVP
+        Case 3 'integer
+            rs("VPlng") = vVP
+        Case 4 'long
+            rs("VPlng") = vVP
+        Case 5 'currency
+            rs("VPcur") = vVP
+        Case 6 'single
+            rs("VPcur") = vVP
+        Case 7 'double
+            rs("VPcur") = vVP
+        Case 8 'date
+            rs("VPfecha") = vVP
+        Case 12 'memo
+            rs("VPmemo") = vVP
+        Case Else 'text
+            rs("VP") = vVP
+    End Select
+    rs.Update
+    PonValorParamRemoto = True
+Salir_PonValorParamRemoto:
+    Exit Function
+Error_PonValorParamRemoto:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en PonValorParamRemoto" & vbCrLf & Err.Description
+            Resume Salir_PonValorParamRemoto
+            Resume Next
+    End Select
+End Function
+
+Public Function DameValorParamRemoto(strMDB As String, strNP As String, Optional strTable As String = "cfgParam", Optional ByRef intOK As Integer = False) As Variant
+    'Devuelve el valor del parámetro encontrado, si el parámetro no existe Devuelve ""
+    On Error GoTo Error_DameValorParamRemoto
+    Dim rs As Recordset, vVP As Variant, db As DAO.Database
+    Set db = OpenDatabase(strMDB, , True)
+    Set rs = db.OpenRecordset(strTable, dbOpenSnapshot)
+    rs.FindFirst "NP = '" & strNP & "'"
+    If rs.NoMatch Then
+        DameValorParamRemoto = Null
         Exit Function
     End If
     Select Case rs("TipoDato")
@@ -245,104 +461,25 @@ Public Function DameValorParam(strNP As String) As Variant
         Case Else 'text
             vVP = rs("VP")
     End Select
-    DameValorParam = vVP
-Salir_DameValorParam:
+    DameValorParamRemoto = vVP
+    intOK = True
+Salir_DameValorParamRemoto:
     Exit Function
-Error_DameValorParam:
+Error_DameValorParamRemoto:
     Select Case Err
         Case Else
-            MsgBox "error nº " & Err & " en DameValorParam" & vbCrLf & Err.Description
-            Resume Salir_DameValorParam
+            MsgBox "error nº " & Err & " en DameValorParamRemoto" & vbCrLf & Err.Description
+            intOK = False
+            Resume Salir_DameValorParamRemoto
             Resume Next
     End Select
 End Function
 
-
-
-Public Function PonValorParam(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10) As Integer
-    'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
-    On Error GoTo Error_PonValorParam
-    Dim rs As Recordset, strTable As String
-    If strNP Like "Puesto*" Then
-        strTable = "pstParam"
-    Else
-        strTable = "cfgParam"
-    End If
-    Set rs = CurrentDb.OpenRecordset(strTable, dbOpenDynaset)
-    rs.FindFirst "NP = '" & strNP & "'"
-    If rs.NoMatch Then
-        MsgBox "Se va a añadir Parámetro " & strNP
-        rs.AddNew
-        rs("NP") = strNP
-        rs("TipoDato") = intTipoDato
-    Else
-        rs.Edit
-    End If
-    Select Case rs("TipoDato")
-        Case 1 'boolean
-            rs("VPbool") = vVP
-        Case 2 'byte
-            rs("VPlng") = vVP
-        Case 3 'integer
-            rs("VPlng") = vVP
-        Case 4 'long
-            rs("VPlng") = vVP
-        Case 5 'currency
-            rs("VPcur") = vVP
-        Case 6 'single
-            rs("VPcur") = vVP
-        Case 7 'double
-            rs("VPcur") = vVP
-        Case 8 'date
-            rs("VPfecha") = vVP
-        Case 12 'memo
-            rs("VPmemo") = vVP
-        Case Else 'text
-            rs("VP") = vVP
-    End Select
-    rs.Update
-    PonValorParam = True
-Salir_PonValorParam:
-    Exit Function
-Error_PonValorParam:
-    Select Case Err
-        Case Else
-            MsgBox "error nº " & Err & " en PonValorParam" & vbCrLf & Err.Description
-            Resume Salir_PonValorParam
-            Resume Next
-    End Select
+Public Function GetUserName() As String
+    GetUserName = Environ("USERNAME")
 End Function
 
 
-
-
-Public Function PonValorParamAC(Optional intTipoDato As Integer = 10) As Integer
-    'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
-    'Pasa El nombre y Calor del Control Activo a PonValorParam
-    On Error GoTo Error_PonValorParamAC
-    Dim strNP As String, vVP As Variant
-    Dim ctl As Control, i As Integer, v As Variant
-    Set ctl = Screen.ActiveControl
-    strNP = ctl.Name
-    vVP = ctl.value
-    i = InStr(ctl.Tag, "param")
-    If i > 0 Then
-        If Len(ctl.Tag) >= i + 7 Then
-            v = Mid(ctl.Tag, i + 5, 3)
-            On Error Resume Next
-            intTipoDato = CInt(v)
-            On Error GoTo Error_PonValorParamAC
-        End If
-    End If
-    PonValorParam strNP, vVP, intTipoDato
-    PonValorParamAC = True
-Salir_PonValorParamAC:
-    Exit Function
-Error_PonValorParamAC:
-    Select Case Err
-        Case Else
-            MsgBox "error nº " & Err & " en PonValorParamAC" & vbCrLf & Err.Description
-            Resume Salir_PonValorParamAC
-            Resume Next
-    End Select
+Public Function GetComputerName() As String
+    GetComputerName = Environ("COMPUTERNAME")
 End Function

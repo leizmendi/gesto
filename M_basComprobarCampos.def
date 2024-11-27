@@ -91,7 +91,7 @@ Public Function ComprobarCampos()
     Set fld = CurrentDb.TableDefs("Clientes").Fields("AgruparAlbaranesSN")
     If Err <> 0 Then
         strMsg = strMsg & Añadir_Campo("Clientes", "AgruparAlbaranesSN", dbBoolean) & vbCrLf
-        CurrentDb.Execute "UPDATE Clientes SET AgruparAlbaranesSN = True", dbFailOnError
+        CurrentDb.Execute "UPDATE Clientes SET AgruparAlbaranesSN = True", dbFailOnError + dbSeeChanges
         strMsg = strMsg & EstablecerPropiedad("Clientes", "AgruparAlbaranesSN", "DefaultValue", True) & vbCrLf
     End If
     Set fld = CurrentDb.TableDefs("tbAlbaranesCab").Fields("CifFacturar")
@@ -180,7 +180,7 @@ Public Sub PonTotalFactura(lngNroFactura As Long)
     strSQL = "UPDATE [Facturas cabeceras] SET [Facturas cabeceras].TotalImporte = " & ComaPunto(curTotal)
     strSQL = strSQL & ", BaseRetencionIRPF = " & ComaPunto(curBaseRet)
     strSQL = strSQL & " WHERE ((([Facturas cabeceras].[Nro Documento])=" & lngNroFactura & "));"
-    CurrentDb.Execute strSQL, dbFailOnError
+    CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
 Salir_PonTotalFactura:
     Exit Sub
 Error_PonTotalFactura:

@@ -13,12 +13,12 @@ Public Function GenerarFacturaDesdeAlbaran(lngIdAlbaranCab As Long, Optional dat
     Dim v As Variant
     Dim rsCli As Recordset
     strSQL = "SELECT * FROM tbAlbaranesCab WHERE IdAlbaranCab = " & lngIdAlbaranCab
-    Set rsACab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    Set rsACab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
     If rsACab.EOF Then Exit Function
 'Ver si hay que generar nueva factura
     If lngIdFacturaCab <> 0 Then
         strSQL = "SELECT * FROM [Facturas cabeceras] WHERE [Nro Documento]= " & lngIdFacturaCab
-        Set rsFCab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+        Set rsFCab = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
         If rsFCab.EOF Then
         Else
             If (Nz(DLookup("AgruparAlbaranesSN", "Clientes", "CIF = '" & rsFCab("CIF Facturar") & "'"), False) = True) _
@@ -45,7 +45,7 @@ Public Function GenerarFacturaDesdeAlbaran(lngIdAlbaranCab As Long, Optional dat
             End If
         End If
     Else
-        Set rsFCab = CurrentDb.OpenRecordset("Facturas cabeceras", dbOpenDynaset)
+        Set rsFCab = CurrentDb.OpenRecordset("Facturas cabeceras", dbOpenDynaset, dbSeeChanges)
     End If
 NuevaFactura:
     rsFCab.AddNew
@@ -79,7 +79,7 @@ GenerarDetalle:
     Set rsADet = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rsADet.EOF Then Exit Function
     strSQL = "SELECT * FROM [Facturas lineas] WHERE [Nro Documento] = " & lngIdFacturaCab
-    Set rsFdet = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    Set rsFdet = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
     If intDetallada = True Then
         rsFdet.AddNew
         rsFdet("[Nro Documento]") = lngIdFacturaCab
@@ -149,7 +149,7 @@ Private Sub AplicarDto(sngDto As Single, lngIdFacturaCab As Long)
     strSQL = "DELETE tbFacturasDet.IdFacturaCab, tbFacturasDet.EsDto"
     strSQL = strSQL & " FROM tbFacturasDet"
     strSQL = strSQL & " WHERE (((tbFacturasDet.IdFacturaCab)=" & lngIdFacturaCab & ") AND ((tbFacturasDet.EsDto)=True));"
-    CurrentDb.Execute strSQL, dbFailOnError
+    CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
     strSQL = "SELECT tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA, tbFacturasDet.RecEq, Sum([Cantidad]*[Precio]) AS ImporteLinea"
     strSQL = strSQL & " FROM tbFacturasDet"
     strSQL = strSQL & " GROUP BY tbFacturasDet.IdFacturaCab, tbFacturasDet.IVA, tbFacturasDet.RecEq"
@@ -160,7 +160,7 @@ Private Sub AplicarDto(sngDto As Single, lngIdFacturaCab As Long)
 '    strSQl = strSQl & " FROM tbFacturasDet"
 '    strSQl = strSQl & " WHERE (((tbFacturasDet.IdFacturaCab)=" & lngIdFacturaCab & ") AND ((tbFacturasDet.EsDto)=False));"
     Set rs0 = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
-    Set rs1 = CurrentDb.OpenRecordset("tbFacturasDet", dbOpenDynaset)
+    Set rs1 = CurrentDb.OpenRecordset("tbFacturasDet", dbOpenDynaset, dbSeeChanges)
     If Not rs0.EOF Then
         rs0.MoveLast
         rs0.MoveFirst

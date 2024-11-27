@@ -55,7 +55,7 @@ VerNombre:
     Else
         If intDestinoUnico = True Then
             'AppActivate DameValorParam("Puesto_AplicacionTitulo")
-            AppActivate Nz(DameValorParam("AplicacionTitulo"), "G4-GESTALEGRIA")
+            AppActivate Nz(GetParam("AplicacionTitulo"), "G4-GESTALEGRIA")
             strDocName = InputBox("Se encontró un archivo existente denominado: " & strDocName & vbCrLf & _
                     "Introduzca el nombre del documento nuevo generado:", "Nombre del documento generado", strDocName)
                     

@@ -1,0 +1,490 @@
+Option Compare Database
+Option Explicit
+
+    Public Const WIN_NORMAL = 1         'Open Normal
+    Public Const WIN_MAX = 3            'Open Maximized
+    Public Const WIN_MIN = 2            'Open Minimized
+
+
+Public Sub ExportarSQL_Excel2(strSQL As String, strFile As String, _
+                            Optional intAbrirDoc As Integer = True, _
+                            Optional strOtros As String, _
+                            Optional xwS As Excel.Worksheet, _
+                            Optional iFilIni As Integer = 1, _
+                            Optional iColIni As Integer = 1, _
+                            Optional strTit As String = "", _
+                            Optional intCerrarExcel As Integer = True, _
+                            Optional intSoloTitulo As Integer = False, _
+                            Optional intNumColsTitulo As Integer = 6, _
+                            Optional intSubTitulo As Integer = False, _
+                            Optional iDB_Access_SQL_RecordSet As Integer = 2, _
+                            Optional sConnect As String = "", _
+                            Optional rsQRY As Recordset)
+    Dim xApp As Excel.Application
+    Dim xwB As Excel.Workbook
+    
+    On Error GoTo Error_ExportarSQL_Excel
+    Dim rs As Recordset, i As Integer, j As Integer, z As Integer
+    Dim intColsFormat() As Integer
+    Dim intImpr() As Integer, intForm() As Integer, intAlin() As Integer, intTotal() As Integer
+    If xwS Is Nothing Then
+        DoCmd.Hourglass True
+        If Len(strFile) < 5 Then
+            strFile = strFile & ".xlsx"
+        End If
+        If Right(strFile, 5) <> ".xlsx" Then
+            strFile = strFile & ".xlsx"
+        End If
+        If Dir(strFile) <> "" Then Kill strFile
+        Set xApp = New Excel.Application ' CreateObject("Excel.application")
+        xApp.Visible = False
+        Set xwB = xApp.Workbooks.Add
+        Set xwS = xwB.Worksheets(1)
+        xwB.SaveAs strFile
+    Else
+        Set xwB = xwS.Parent
+        Set xApp = xwB.Parent
+    End If
+    If intSoloTitulo = True Then GoTo Titulo
+    
+    If iDB_Access_SQL_RecordSet = 1 Then
+        Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+    ElseIf iDB_Access_SQL_RecordSet = 2 Then
+        Set rs = Q_p_t(strSQL, sConnect)
+    Else
+        Set rs = rsQRY
+    End If
+    If Not rs.EOF Then
+        rs.MoveLast
+        rs.MoveFirst
+    End If
+    
+    PonOtros rs.Fields.Count, strOtros, intImpr(), intForm(), intAlin(), intTotal
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''' Título '''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Titulo:
+    If strTit <> "" Then
+        'xWs.Range(Cells(iFilIni, iColIni), Cells(iFilIni, iColIni + rs.Fields.Count)).Select
+        If intSoloTitulo = False Then
+            xwS.Range(ColumnaExcel(CLng(iColIni)) & iFilIni & ":" & ColumnaExcel(CLng(iColIni) + rs.Fields.Count - 1) & iFilIni).Select
+        Else
+            xwS.Range(ColumnaExcel(CLng(iColIni)) & iFilIni & ":" & ColumnaExcel(CLng(iColIni) + intNumColsTitulo - 1) & iFilIni).Select
+        End If
+        'strRange = ColumnaExcel(CLng(iCol)) & iFil & ":" & ColumnaExcel(CLng(iCol) + iCant + 2) & iFil
+        'xWs.Range(strRange).Select
+        
+        xApp.Selection.Merge
+        With xApp.Selection
+            .Interior.ColorIndex = IIf(intSoloTitulo = False, 34, IIf(intSubTitulo = False, 33, 35))
+            .RowHeight = 30
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .WrapText = True
+        End With
+        
+        
+        xwS.Cells(iFilIni, iColIni) = strTit
+        iFilIni = iFilIni + 1
+        i = iFilIni
+        If intSoloTitulo = True Then GoTo Acabando
+    End If
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''' Cabecera '''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    For j = 0 To rs.Fields.Count - 1
+        xwS.Cells(iFilIni, j + iColIni) = "'" & rs.Fields(j).Name
+        
+        xwS.Cells(iFilIni, iColIni + j).Select
+        xApp.Selection.HorizontalAlignment = xlCenter
+        xApp.Selection.EntireColumn.AutoFit
+        xApp.Selection.Font.Bold = True
+        xApp.Selection.Interior.ColorIndex = 15
+        
+        'formato de la columna
+        If strOtros <> "" Then
+            xwS.Range(ColumnaExcel(CLng(j + iColIni)) & iFilIni & ":" & ColumnaExcel(CLng(j + iColIni)) & iFilIni + rs.Fields.Count).Select
+            Select Case intForm(j + 1)
+                Case 3
+                    xApp.Selection.NumberFormat = "#,##0.00 €;-#,##0.00 €;-"
+                Case 4
+                    xApp.Selection.NumberFormat = "#,##0;-#,##0;-"
+                Case 5
+                    xApp.Selection.NumberFormat = "dd/mm/yyyy"
+                Case 6, 7
+                    xApp.Selection.NumberFormat = "0.00 %"
+                Case 8
+                    xApp.Selection.NumberFormat = "#,##0.00"
+            End Select
+            Select Case intAlin(j + 1)
+                Case 0
+                Case 1
+                    xApp.Selection.HorizontalAlignment = xlLeft
+                Case 2
+                    xApp.Selection.HorizontalAlignment = xlCenter
+                Case 3
+                    xApp.Selection.HorizontalAlignment = xlRight
+            End Select
+        End If
+    Next j
+    
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    ''''''''''''''''''''''''''''''''  Datos   '''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    i = iFilIni
+    z = rs.RecordCount
+    While Not rs.EOF
+        i = i + 1
+        For j = 0 To rs.Fields.Count - 1
+            'xWs.Cells(i, j + 1) = Left(rs.Fields(j), 32768)
+            xwS.Cells(i, iColIni + j) = rs.Fields(j)
+        Next j
+        rs.MoveNext
+        SysCmd acSysCmdSetStatus, "Generando Hoja Excel: " & i - 1 & "/" & z & " filas"
+    Wend
+    i = i + 1
+    
+    
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    ''''''''''''''''''''''''''''''''   Pie    '''''''''''''''''''''''''''''
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Dim intHayTotal As Integer, k As Integer
+    For j = 0 To rs.Fields.Count - 1
+'        xWs.Cells(iFilIni, iColIni + j).Select
+'        xApp.Selection.HorizontalAlignment = xlCenter
+'        xApp.Selection.EntireColumn.AutoFit
+'        xApp.Selection.Font.Bold = True
+'        xApp.Selection.Interior.ColorIndex = 15
+        If strOtros <> "" Then
+            If intTotal(j + 1) > 0 Then
+                If intHayTotal = False Then
+                    xwS.Cells(i, iColIni) = "TOTAL"
+                    intHayTotal = True
+                End If
+                'xWs.Cells(i, j + 1) = xApp.WorksheetFunction.Sum(Range(Cells(2, j + 1), Cells(i - 1, j + 1)))
+                xwS.Cells(i, j + iColIni).Formula = "=SUM(" & xwS.Cells(iFilIni + 1, j + iColIni).Address(False, False) & ":" & xwS.Cells(i - 1, j + iColIni).Address(False, False) & ")"
+            End If
+        End If
+    Next j
+    If strOtros <> "" Then
+        xwS.Range(ColumnaExcel(CLng(iColIni)) & i & ":" & ColumnaExcel(CLng(iColIni) + rs.Fields.Count - 1) & i).Select
+        xApp.Selection.Font.Bold = True
+        xApp.Selection.Interior.ColorIndex = 15
+    End If
+    
+    
+'    For k = 0 To rs.Fields.Count - 1
+'        xWs.Cells(iFilIni, iColIni + 1).Select
+'        xApp.Selection.Font.Bold = True
+'        xApp.Selection.Interior.ColorIndex = 15
+'        'xApp.Selection.Interior.HorizontalAlignment = xlHAlignCenter
+'        If strOtros <> "" Then
+'            xWs.Cells(i, k).Select
+'            xApp.Selection.Font.Bold = True
+'            xApp.Selection.Interior.ColorIndex = 15
+'        End If
+'
+'        xApp.Selection.EntireColumn.AutoFit
+'    Next k
+    For k = iFilIni To rs.RecordCount
+        xApp.Rows(k + 1).RowHeight = 30
+        xApp.Rows(k + 1).VerticalAlignment = xlVAlignTop
+    Next k
+Acabando:
+    iFilIni = i + 2
+    iColIni = iColIni
+    xwS.Cells(1, 1).Select
+    xwB.Save
+    If intCerrarExcel Then
+        xApp.Quit
+        Set xApp = Nothing
+        Set xwB = Nothing
+        Set xwS = Nothing
+    End If
+    If intAbrirDoc Then
+        Dim vReturn As Variant
+         vReturn = OpenFile(strFile)
+         If vReturn <> -1 Then MsgBox vReturn, vbExclamation
+    End If
+Salir_ExportarSQL_Excel:
+    DoCmd.Hourglass False
+    SysCmd acSysCmdClearStatus
+    Exit Sub
+Error_ExportarSQL_Excel:
+    Select Case Err
+        Case 3464, 1004
+            Resume Next
+        Case Else
+            If Not xwB Is Nothing Then xwB.Close False
+            MsgBox "Error nº " & Err & " en ExportarSQL_Excel" & vbCrLf & Err.Description
+            Resume Salir_ExportarSQL_Excel
+    End Select
+
+End Sub
+
+Public Function PonOtros(intNumCampos As Integer, strOtros As String, intImpr() As Integer, intForm() As Integer, intAlin() As Integer, intTotal() As Integer)
+    On Error GoTo Error_PonOtros
+    If strOtros = "" Then GoTo Salir_PonOtros
+    Dim i As Integer, k As Integer, intC1 As Integer, intC2 As Integer, intC3 As Integer, intC4 As Integer
+    
+    ReDim intImpr(1 To intNumCampos) As Integer
+    'ReDim intAnch(1 To intgCampos) As Integer
+    ReDim intAlin(1 To intNumCampos) As Integer
+    ReDim intForm(1 To intNumCampos) As Integer
+    ReDim intTotal(1 To intNumCampos) As Integer
+    intC1 = InStr(1, strOtros, ",")
+    intC2 = InStr(intC1 + 1, strOtros, ",")
+    intC3 = InStr(intC2 + 1, strOtros, ",")
+    intC4 = InStr(intC3 + 1, strOtros, ",")
+    For i = 1 To intNumCampos
+        If k = 0 Then
+            If Mid(strOtros, i, 1) = "," Then k = i - 1
+        End If
+        If k > 0 Then
+            intImpr(i) = CInt(Mid(strOtros, k, 1))
+            'intAnch(i) = CInt(Mid(strOtros, intC1 + 1 + (k - 1) * 2, 2))
+            intAlin(i) = CInt(Mid(strOtros, intC2 + k, 1))
+            intForm(i) = CInt(Mid(strOtros, intC3 + k, 1))
+            intTotal(i) = CInt(Mid(strOtros, intC4 + k, 1))
+        Else
+            intImpr(i) = CInt(Mid(strOtros, i, 1))
+            'intAnch(i) = CInt(Mid(strOtros, intC1 + 1 + (i - 1) * 2, 2))
+            intAlin(i) = CInt(Mid(strOtros, intC2 + i, 1))
+            intForm(i) = CInt(Mid(strOtros, intC3 + i, 1))
+            intTotal(i) = CInt(Mid(strOtros, intC4 + i, 1))
+        End If
+    Next i
+Salir_PonOtros:
+    Exit Function
+Error_PonOtros:
+    Select Case Err
+        Case Else
+            MsgBox "error nº " & Err & " en PonOtros" & vbCrLf & Err.Description
+            Resume Salir_PonOtros
+    End Select
+End Function
+
+Public Sub ExportarLista_Excel(strLista As String, strSeparador As String, intNumCols As Integer, strFile As String, strDescripcionLista As String, _
+                                Optional intAbrirDoc As Integer = True, _
+                                Optional strOtros As String, _
+                                Optional intColumnaTitulo As Integer = 2)
+    Dim mobjExcel As Excel.Application
+    Dim mxlsExcel As Excel.Workbook
+    
+    On Error GoTo Error_ExportarLista_Excel
+    Dim ws As Worksheet, i As Integer, j As Integer, z As Integer 'rs As Recordset,
+    Dim intColsFormat() As Integer, vLst As Variant
+    Dim intImpr() As Integer, intForm() As Integer, intAlin() As Integer, intTotal() As Integer
+    DoCmd.Hourglass True
+    vLst = Split(strLista, strSeparador)
+    
+    Set mobjExcel = CreateObject("Excel.application")
+    mobjExcel.Visible = False
+    If Len(strFile) < 5 Then
+        strFile = strFile & ".xlsx"
+    End If
+    If Right(strFile, 4) <> ".xlsx" Then
+        strFile = strFile & ".xlsx"
+    End If
+    If Dir(strFile) <> "" Then Kill strFile
+    Set mxlsExcel = mobjExcel.Workbooks.Add
+    Set ws = mxlsExcel.Worksheets(1)
+    ws.Cells(1, intColumnaTitulo) = strDescripcionLista
+    'Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+  'Transfer the data to Excel
+   'ws.Range("A1").CopyFromRecordset rs
+    PonOtros intNumCols, strOtros, intImpr(), intAlin(), intForm(), intTotal
+    For j = 0 To intNumCols - 1
+        ws.Cells(2, j + 1) = "'" & vLst(j) 'rs.Fields(j).Name
+        'formato de la columna
+        'ws.Range(Cells(2, j + 1), Cells(2, j + 1)).Select
+        ws.Cells(2, j + 1).Select
+        mobjExcel.Selection.EntireColumn.Select
+        'If intImpr(j + 1) = 0 Then
+ '           mobjExcel.Selection.Hidden = True
+        'Else
+'            mobjExcel.Selection.Hidden = False
+        'End If
+        If strOtros <> "" Then
+            Select Case intForm(j + 1)
+                Case 3
+                    mobjExcel.Selection.NumberFormat = "#,##0.00 €"
+                Case 4
+                    mobjExcel.Selection.NumberFormat = "#,##0;-#,##0;-"
+                Case 5
+                    mobjExcel.Selection.NumberFormat = "dd/mm/yyyy"
+                Case 6, 7
+                    mobjExcel.Selection.NumberFormat = "0.00 %"
+                Case 8
+                    mobjExcel.Selection.NumberFormat = "#,##0.00"
+            End Select
+                    
+        End If
+    Next j
+    
+    i = 2
+    'If Not rs.EOF Then
+    '    rs.MoveLast
+    '    rs.MoveFirst
+    'End If
+    z = UBound(vLst) / intNumCols 'rs.RecordCount
+    While (i - 1) * intNumCols + intNumCols - 1 <= UBound(vLst) 'Not rs.EOF
+        i = i + 1
+        For j = 0 To intNumCols - 1
+            'ws.Cells(i, j + 1) = Left(rs.Fields(j), 32768)
+            ws.Cells(i, j + 1) = vLst((i - 2) * intNumCols + j) 'rs.Fields(j)
+        Next j
+        'rs.MoveNext
+        SysCmd acSysCmdSetStatus, "Generando Hoja Excel: " & i - 1 & "/" & z & " filas"
+    Wend
+    i = i + 1
+    Dim intHayTotal As Integer, k As Integer
+    For j = 0 To intNumCols - 1
+        ws.Cells(1, j + 1).Select
+        mobjExcel.Selection.HorizontalAlignment = xlCenter
+        mobjExcel.Selection.EntireColumn.AutoFit
+        If strOtros <> "" Then
+            If intTotal(j + 1) = 1 Then
+                If intHayTotal = False Then
+                    ws.Cells(i, 1) = "TOTAL"
+                    intHayTotal = True
+                End If
+                'ws.Cells(i, j + 1) = mobjExcel.WorksheetFunction.Sum(Range(Cells(2, j + 1), Cells(i - 1, j + 1)))
+                ws.Cells(i, j + 1).Formula = "=SUM(" & ws.Cells(2, j + 1).Address(False, False) & ":" & ws.Cells(i - 1, j + 1).Address(False, False) & ")"
+            End If
+        End If
+    Next j
+    
+    For k = 1 To intNumCols 'rs.Fields.Count
+        ws.Cells(2, k).Select
+        mobjExcel.Selection.Font.Bold = True
+        mobjExcel.Selection.Interior.ColorIndex = 15
+        'mobjExcel.Selection.Interior.HorizontalAlignment = xlHAlignCenter
+        If strOtros <> "" Then
+            ws.Cells(i, k).Select
+            mobjExcel.Selection.Font.Bold = True
+            mobjExcel.Selection.Interior.ColorIndex = 15
+        End If
+        
+        mobjExcel.Selection.EntireColumn.AutoFit
+    Next k
+    For k = 1 To intNumCols 'rs.RecordCount
+        mobjExcel.Rows(k + 1).RowHeight = 30
+        mobjExcel.Rows(k + 1).VerticalAlignment = xlVAlignTop
+    Next k
+    ws.Cells(1, 1).Select
+    mxlsExcel.SaveAs (strFile)
+    mobjExcel.Quit
+    If intAbrirDoc Then
+        Dim vReturn As Variant
+         vReturn = OpenFile(strFile)
+         If vReturn <> -1 Then MsgBox vReturn, vbExclamation
+        End If
+Salir_ExportarLista_Excel:
+    DoCmd.Hourglass False
+    SysCmd acSysCmdClearStatus
+    Set mobjExcel = Nothing
+    Set mxlsExcel = Nothing
+    Set ws = Nothing
+    Exit Sub
+Error_ExportarLista_Excel:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en ExportarLista_Excel" & vbCrLf & Err.Description
+            Resume Salir_ExportarLista_Excel
+    End Select
+
+End Sub
+
+
+Public Function SaveFileTxt(strTxt As String, Optional strFile As String = "") As String
+    On Error GoTo HandleError
+    If strFile = "" Then strFile = FileDialog(msoFileDialogSaveAs)
+    If strFile = "" Then GoTo HandleExit
+    Open strFile For Output As #1
+    Print #1, strTxt;
+    Close
+    SaveFileTxt = strFile
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Public Function SQL_ToTxt(sSQL As String, _
+                          Optional sSep As String = ",", _
+                          Optional sSalto As String = vbCrLf, _
+                          Optional bConComillas As Boolean = False, _
+                          Optional sFile As String = "") As String
+    On Error GoTo HandleError
+    Dim rs As Recordset, sTxt As String, i As Integer
+    Set rs = CurrentDb.OpenRecordset(sSQL, dbOpenSnapshot)
+    While Not rs.EOF
+        For i = 0 To rs.Fields.Count - 1
+            sTxt = sTxt & IIf(bConComillas, ConComillas(rs(i)), rs(i)) & sSep
+        Next i
+        sTxt = RecDerTop(sTxt, Len(sSep), 0)
+        rs.MoveNext
+        If Not rs.EOF Then sTxt = sTxt & sSalto
+    Wend
+            
+    
+    SQL_ToTxt = SaveFileTxt(sTxt, sFile)
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+
+
+
+Function ColumnaExcel(lCol As Long) As String
+    On Error GoTo HandleError
+    Dim iDividendo As Long, iCociente As Long, iResto As Long, strR As String
+    Const A_to_Z As String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    iDividendo = lCol
+Bucle:
+    If iDividendo = 0 Then GoTo Resultado
+    iResto = (iDividendo - 1) Mod 26
+    strR = Mid(A_to_Z, iResto + 1, 1) & strR
+    iCociente = (iDividendo - 1) \ 26
+    iDividendo = iCociente
+    GoTo Bucle
+Resultado:
+    ColumnaExcel = strR
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Function ColumnaExcel_to_Long(strCol As String) As Long
+    On Error GoTo HandleError
+    Dim sC As String, i As Integer, lR As Long, j As Integer, iPos As Integer
+    Const A_to_Z As String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    i = Len(strCol)
+Bucle:
+    If i = 0 Then GoTo Resultado
+    j = j + 1
+    iPos = InStr(A_to_Z, Mid(strCol, i, 1))
+    If iPos = 0 Then
+        MsgBox "Columna no correcta: no puede contener la letra: " & UCase(Mid(strCol, i, 1)), vbExclamation
+        GoTo HandleExit
+    End If
+    lR = lR + 26 ^ (j - 1) * iPos
+    i = i - 1
+    GoTo Bucle
+Resultado:
+    ColumnaExcel_to_Long = lR
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function

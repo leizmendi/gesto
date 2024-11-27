@@ -16,7 +16,7 @@ Public Function GenerarFicheroDGT_M(Optional lngIdEnlaceM As Long = 0, Optional 
     Else
         strSQL = strSQL & " WHERE IdEnlaceM = " & lngIdEnlaceM
     End If
-    Set grsEnl = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    Set grsEnl = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
     If intAbrirFichero Then
         i = 0
         lngNumDoc = 0
@@ -151,7 +151,7 @@ Private Sub GenerarLineaM(strLin As String)
     strLin = strLin & LlenaIzq(grsEnl("MunicipioVehiculo"), 24)
     strLin = strLin & LlenaIzq(grsEnl("PuebloVehiculo"), 24)
     strLin = strLin & LlenaIzq(grsEnl("CodigoPostalVehiculo"), 5)
-    strLin = strLin & LlenaIzqChar(NuloEs(DameValorParam("EnlacesNumProfesional"), "00000"), 5, "0")
+    strLin = strLin & LlenaIzqChar(NuloEs(GetParam("EnlacesNumProfesional"), "00000"), 5, "0")
     strLin = strLin & LlenaIzq(grsEnl("6UltimosDigitos"), 6)
     If IsDate(grsEnl("FechaCreacionDocumento")) Then
         strLin = strLin & Format(grsEnl("FechaCreacionDocumento"), "yyyymmdd")
@@ -180,14 +180,14 @@ Public Function AbrirFicheroDGT_M(ByRef strFile As String) As Integer
     Dim strSQL As String, stLin As String, i As Integer
     Dim strMensaje As String, varReturn As Variant
     AbrirFicheroDGT_M = False
-    strFile = NuloEs(DameValorParam("EnlacesMatriculacionesCarpetaFicheroDGT"), "C:\")
+    strFile = NuloEs(GetParam("EnlacesMatriculacionesCarpetaFicheroDGT"), "C:\")
     If Right(strFile, 1) <> "\" Then strFile = strFile & "\"
     strFile = strFile & "EnlaceM_" & Format(Now(), "yyyymmddhhnnss") & ".DGT"
     Open strFile For Output As #1
     'grabar 1er. registro
     stLin = "PDF"
-    stLin = stLin & LlenaIzqChar(NuloEs(DameValorParam("EnlacesNumProfesional"), "00000"), 5, "0")
-    stLin = stLin & LlenaIzq(NuloEs(DameValorParam("EnlacesGestoria"), "GESTORIA XXXXX"), 50)
+    stLin = stLin & LlenaIzqChar(NuloEs(GetParam("EnlacesNumProfesional"), "00000"), 5, "0")
+    stLin = stLin & LlenaIzq(NuloEs(GetParam("EnlacesGestoria"), "GESTORIA XXXXX"), 50)
     Print #1, stLin
     AbrirFicheroDGT_M = True
 Salir_AbrirFicheroDGT_M:

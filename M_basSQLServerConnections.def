@@ -122,9 +122,15 @@ HandleExit:
     Exit Sub
 HandleError:
     MsgBox Err.Description
-    Resume 'HandleExit
+    Resume HandleExit
 End Sub
 
 Public Function pepe()
-    AttachDSNLessTable "Matriculaciones", "dbo.Matriculaciones", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Matriculaciones", "dbo.Matriculaciones", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Revisión de Vehículos", "dbo.Revisión de Vehículos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Vehículos", "dbo.Vehículos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Revisión de Vehículos", "dbo.Revisión de Vehículos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Renovación de Permisos", "dbo.Renovación de Permisos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Facturas lineas", "dbo.Facturas lineas", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    AttachDSNLessTable "Renovación Otros Documentos", "dbo.Renovación Otros Documentos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
 End Function

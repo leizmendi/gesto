@@ -111,7 +111,7 @@ Public Function CrearTablaConexiones() As Integer
     Dim i As Integer, j As Integer
     On Error GoTo Error_CrearTablaConexiones
     Set db = CurrentDb
-    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset)
+    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset, dbSeeChanges)
     
     'strPathNow = db.Name
     'strPathNow = DirectorioDe(strPathNow)
@@ -212,7 +212,7 @@ Public Function ReconectarTablasYaVinculadas() As Integer
     Dim i As Integer, j As Integer
     On Error GoTo Error_ReconectarTablasYaVinculadas
     Set db = CurrentDb
-    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset)
+    Set rs = db.OpenRecordset("1myConexionTablas", dbOpenDynaset, dbSeeChanges)
     strPathNow = db.Name
     strPathNow = DirectorioDe(strPathNow)
     For i = 0 To db.TableDefs.Count - 1

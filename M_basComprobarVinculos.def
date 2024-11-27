@@ -34,7 +34,7 @@ Public Function ComprobarVinculos()
         CurrentDb.Execute strSQL, dbFailOnError
         
         ReconectarTablasYaVinculadas
-        PonValorParam "CarpetaDatos", strCarDatos0
+        SetParam "CarpetaDatos", strCarDatos0
         intR = MsgBox("¿Volver a vincular la próxima vez que se inice el programa?", vbDefaultButton2 + vbYesNo + vbQuestion)
         If intR = vbNo Then
             strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioDeConexion = '" & strCurDir & "'"
@@ -148,10 +148,10 @@ End Function
 Public Function Titulo_e_Icono()
     Dim intX As Integer
     Dim strPath As String, strTitulo As String, strIco As String
-    strTitulo = NuloEs(DameValorParam("AplicacionTitulo"), "G4-GESTALEGRIA")
+    strTitulo = NuloEs(GetParam("AplicacionTitulo"), "G4-GESTALEGRIA")
     intX = AddPropAp("AppTitle", dbText, strTitulo)
     strPath = miDirectorioDe(CurrentDb.Name)
-    strIco = DameValorParam("CarpetaDatos") & NuloEs(DameValorParam("AplicacionIcono"), "gA.ico")
+    strIco = GetParam("CarpetaDatos") & NuloEs(GetParam("AplicacionIcono"), "gA.ico")
     If Dir(strIco) = "" Then
         strIco = strPath & strIco
     End If

@@ -10,7 +10,7 @@ Public Sub Añadir_Modif_tMatriculacion(strBastidor As String, Optional intSoloAñ
     strSQL = strSQL & " WHERE (((Matriculaciones.Bastidor)=" & ConComillas(strBastidor) & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset)
+    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstM.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
@@ -24,7 +24,7 @@ Public Sub Añadir_Modif_tMatriculacion(strBastidor As String, Optional intSoloAñ
     Else
         rstM.AddNew
         rstM("Numero") = NuloEs(DMax("Numero", "tMatriculaciones"), 0) + 1
-        CurrentDb.Execute "UPDATE Matriculaciones SET [Nro Documento] = " & rstM("Numero") & " WHERE Bastidor = " & ConComillas(rs("Matriculaciones.Bastidor")), dbFailOnError
+        CurrentDb.Execute "UPDATE Matriculaciones SET [Nro Documento] = " & rstM("Numero") & " WHERE Bastidor = " & ConComillas(rs("Matriculaciones.Bastidor")), dbFailOnError + dbSeeChanges
         'rs.Edit
         'rs("Nro Documento") = rstM("Numero")
         'rs.Update
@@ -34,11 +34,11 @@ Public Sub Añadir_Modif_tMatriculacion(strBastidor As String, Optional intSoloAñ
     'lngidM = rstM("IdMatriculacion")
     'rstM ("IdCliente")
     rstM("Tipo") = "Matriculación" '"040"
-    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
-    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = NuloEs(GetParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     strAux = strAux & "040" & Format(Date, "yyyy") & Format(rstM("Numero"), "000000")
     rstM("NumDocumento") = strAux
-    rstM("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstM("NumProfesional") = NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     rstM("FechExportacion") = 0
     rstM("FechCreacion") = Now()
     rstM("FechDevolucion") = 0
@@ -127,7 +127,7 @@ Public Sub Comprobar_tMatriculacion(lngNroDocumento As Long, ByRef intCambio As 
     strSQL = strSQL & " WHERE (((Matriculaciones.[Nro Documento])=" & lngNroDocumento & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset)
+    Set rstM = CurrentDb.OpenRecordset("tMatriculaciones", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstM.FindFirst "Numero = " & lngNroDocumento
@@ -308,7 +308,7 @@ Public Sub Añadir_Modif_tTransmision(lngNroRegistro As Long, Optional intSoloAña
     strSQL = strSQL & " WHERE (((Transferencias.NroRegistro)=" & lngNroRegistro & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset)
+    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstT.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
@@ -323,7 +323,7 @@ Public Sub Añadir_Modif_tTransmision(lngNroRegistro As Long, Optional intSoloAña
         'if rs("Nro Documento") no es nulo ??? de momento ná
         rstT.AddNew
         rstT("Numero") = NuloEs(DMax("Numero", "tTransmisiones"), 0) + 1
-        CurrentDb.Execute "UPDATE Transferencias SET [Nro Documento] = " & rstT("Numero") & " WHERE NroRegistro = " & rs("NroRegistro"), dbFailOnError
+        CurrentDb.Execute "UPDATE Transferencias SET [Nro Documento] = " & rstT("Numero") & " WHERE NroRegistro = " & rs("NroRegistro"), dbFailOnError + dbSeeChanges
 '        rs.Edit
 '        rs("NroDocumento") = rstT("Numero")
 '        rs.Update
@@ -334,11 +334,11 @@ Public Sub Añadir_Modif_tTransmision(lngNroRegistro As Long, Optional intSoloAña
     'lngidM = rstT("IdTransmision")
     'rstT ("IdCliente")
     rstT("Tipo") = "Transmisión" '"030"
-    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
-    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = NuloEs(GetParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     strAux = strAux & "030" & Format(Date, "yyyy") & Format(rstT("Numero"), "000000")
     rstT("NumDocumento") = strAux
-    rstT("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstT("NumProfesional") = NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     rstT("FechExportacion") = 0
     rstT("FechCreacion") = Now()
     'rstT("FechLimitacion") = Null 'Now()
@@ -415,7 +415,7 @@ Error_Añadir_Modif_tTransmision:
     Select Case Err
         Case Else
             MsgBox "Error nº " & Err & " en Añadir_Modif_tTransmision" & vbCrLf & Err.Description
-            Resume Salir_Añadir_Modif_tTransmision
+            Resume 'Salir_Añadir_Modif_tTransmision
     End Select
 End Sub
 
@@ -429,7 +429,7 @@ Public Sub Comprobar_tTransmision(lngNroDocumento As Long, ByRef intCambio As In
     strSQL = strSQL & " WHERE (((Transferencias.[Nro Documento])=" & lngNroDocumento & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset)
+    Set rstT = CurrentDb.OpenRecordset("tTransmisiones", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstT.FindFirst "Numero = " & lngNroDocumento
@@ -637,7 +637,7 @@ Public Sub Añadir_Modif_tBaja(lngIdBajaV As Long, Optional intSoloAñadir As Inte
     strSQL = strSQL & " WHERE ((([Baja de Vehículos].[IdBajaV])=" & lngIdBajaV & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset)
+    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstB.FindFirst "Numero = " & NuloEs(rs("Nro Documento"), 0)
@@ -652,7 +652,7 @@ Public Sub Añadir_Modif_tBaja(lngIdBajaV As Long, Optional intSoloAñadir As Inte
         'if rs("Nro Documento") no es nulo ??? de momento ná
         rstB.AddNew
         rstB("Numero") = NuloEs(DMax("Numero", "tBajas"), 0) + 1
-        CurrentDb.Execute "UPDATE [Baja de Vehículos] SET [Nro Documento] = " & rstB("Numero") & " WHERE IdBajaV = " & lngIdBajaV, dbFailOnError
+        CurrentDb.Execute "UPDATE [Baja de Vehículos] SET [Nro Documento] = " & rstB("Numero") & " WHERE IdBajaV = " & lngIdBajaV, dbFailOnError + dbSeeChanges
 '        rs.Edit
 '        rs("NroDocumento") = rstB("Numero")
 '        rs.Update
@@ -662,11 +662,11 @@ Public Sub Añadir_Modif_tBaja(lngIdBajaV As Long, Optional intSoloAñadir As Inte
     'lngidM = rstB("IdTransmision")
     'rstB ("IdCliente")
     rstB("Tipo") = "Baja" '"020"
-    strAux = NuloEs(DameValorParam("EstablecimientoProvincia"), "00")
-    strAux = strAux & NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    strAux = NuloEs(GetParam("EstablecimientoProvincia"), "00")
+    strAux = strAux & NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     strAux = strAux & "020" & Format(Date, "yyyy") & Format(rstB("Numero"), "000000")
     rstB("NumDocumento") = strAux
-    rstB("NumProfesional") = NuloEs(DameValorParam("EstablecimientoNumProfesional"), "00000")
+    rstB("NumProfesional") = NuloEs(GetParam("EstablecimientoNumProfesional"), "00000")
     rstB("FechExportacion") = 0
     rstB("FechCreacion") = Now()
     rstB("FechDevolucion") = 0
@@ -743,7 +743,7 @@ Public Sub Comprobar_tBaja(lngNroDocumento As Long, ByRef intCambio As Integer, 
     strSQL = strSQL & " WHERE ((([Baja de Vehículos].[Nro Documento])=" & lngNroDocumento & "))"
     Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
     If rs.EOF Then Exit Sub
-    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset)
+    Set rstB = CurrentDb.OpenRecordset("tBajas", dbOpenDynaset, dbSeeChanges)
     Set rsDir = CurrentDb.OpenRecordset("Direcciones Clientes", dbOpenSnapshot)
     rs.MoveFirst
     rstB.FindFirst "Numero = " & lngNroDocumento

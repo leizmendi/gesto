@@ -13,7 +13,7 @@ Public Sub AñadirReciboDeFactura(lngNroDocumento As Long, lngIdReciboEmision As 
     strSQL = strSQL & ", [Facturas cabeceras].NumRecibo, [Facturas cabeceras].Cobrada, [Facturas cabeceras].Observaciones"
     strSQL = strSQL & " FROM [Facturas cabeceras] INNER JOIN Clientes ON [Facturas cabeceras].[CIF Facturar] = Clientes.CIF"
     strSQL = strSQL & " WHERE [Facturas cabeceras].[Nro Documento]=" & lngNroDocumento
-    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    Set rs = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
     If rs.EOF Then
         MsgBox "No se encontró la Factura Nro: " & lngNroDocumento, vbExclamation
         Exit Sub
@@ -35,7 +35,7 @@ Public Sub AñadirReciboDeFactura(lngNroDocumento As Long, lngIdReciboEmision As 
     End If
     strSQL = "SELECT * FROM tbRecibos"
     strSQL = strSQL & " WHERE IdReciboEmision = " & lngIdReciboEmision
-    Set rsR = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+    Set rsR = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset, dbSeeChanges)
     While Not rs.EOF
         rsR.AddNew
         rsR("ENTIDAD") = rs("CodigoEntidad")
@@ -57,12 +57,12 @@ Public Sub AñadirReciboDeFactura(lngNroDocumento As Long, lngIdReciboEmision As 
         If curRetencion <> 0 Then
             strSQL = "INSERT INTO tbRecibosDet(NumRecibo, Linea, Concepto, Importe)"
             strSQL = strSQL & " SELECT " & lngNumRecibo & " AS num, 1 as lin, 'Total Importe Factura' as con, " & ComaPunto(rs("TotalImporte")) & " as tot"
-            CurrentDb.Execute strSQL, dbFailOnError
+            CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
             strSQL = "INSERT INTO tbRecibosDet(NumRecibo, Linea, Concepto, Importe)"
             strSQL = strSQL & " SELECT " & lngNumRecibo & " AS num, 2 as lin, 'Retención IRPF' as con, " & ComaPunto(-1 * curRetencion) & " as tot"
-            CurrentDb.Execute strSQL, dbFailOnError
+            CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
             strSQL = "UPDATE tbRecibos SET Detalle = True WHERE NUMRECIBO = " & lngNumRecibo
-            CurrentDb.Execute strSQL, dbFailOnError
+            CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
         End If
         rs.Edit
         rs("NumRecibo") = lngNumRecibo
@@ -84,7 +84,7 @@ Public Sub AñadirReciboDeFactura(lngNroDocumento As Long, lngIdReciboEmision As 
         curTotal = DSum("IMPORTE", "tbRecibos", "IdReciboEmision = " & lngIdReciboEmision)
         strSQL = "UPDATE tbRecibosEmisiones SET NumRecibos = " & intNumRecibos & ", TotalImporte = " & ComaPunto(curTotal)
         strSQL = strSQL & " WHERE IdReciboEmision = " & lngIdReciboEmision
-        CurrentDb.Execute strSQL, dbFailOnError
+        CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
     End If
 Salir_AñadirReciboDeFactura:
     Exit Sub
