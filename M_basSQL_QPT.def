@@ -9,11 +9,11 @@ Public Function Q_p_t(sSQL As String, _
                       Optional bResult As Boolean, _
                       Optional lRecordsAffected As Long) As Object
     On Error GoTo HandleError
-    Dim qdf As DAO.QueryDef, rst As DAO.Recordset, iErr0 As Long, iErr1 As Long
+    Dim qdf As dao.QueryDef, rst As dao.Recordset, iErr0 As Long, iErr1 As Long
     
     bNoTry = True ' Da errores al acceder a tabla errores.... lo quito pfff
     
-    If sConnect = "" Then sConnect = GetConnectSQL(sSQL)
+    If sConnect = "" Then sConnect = gsc() 'GetConnectSQL(sSQL)
     If sConnect = "" Then GoTo HandleExit
     Set qdf = CurrentDb.CreateQueryDef("")
     qdf.Connect = sConnect '"ODBC;Driver=SQL Server;Server=.\SQLEXPRESS;Trusted_Connection=Yes;"
@@ -270,7 +270,7 @@ End Function
 
 Public Function SQL_MyLastError(Optional sConnect As String = "") As Long
     On Error GoTo HandleError
-    Dim qdf As DAO.QueryDef, rst As DAO.Recordset, vR As Variant
+    Dim qdf As dao.QueryDef, rst As dao.Recordset, vR As Variant
     If sConnect = "" Then sConnect = gsc()
     If sConnect = "" Then GoTo HandleExit
     Set qdf = CurrentDb.CreateQueryDef("")
@@ -389,4 +389,33 @@ Function vts(vValor As Variant _
                      , iTipo As Integer _
             , Optional vIsNull As Variant = Null) As String
     vts = DimeValorTipo2SQL(vValor, iTipo, vIsNull)
+End Function
+
+
+Public Function LlenaParams(sParams As String _
+                          , iHastaNumPArams As Integer _
+                          , Optional sDelimiterIn As String = "," _
+                          , Optional sDelimiterOut As String = ",") As String
+    Dim vParams As Variant, i As Integer, sResult As String
+    vParams = Split(sParams, sDelimiterIn)
+    If UBound(vParams) + 1 > iHastaNumPArams Then
+        MsgBox "Se enviaron más parámetros del tope", vbExclamation
+        GoTo HandleExit
+    End If
+    For i = 0 To UBound(vParams)
+        sResult = sResult & vParams(i) & sDelimiterOut
+    Next i
+    While i < iHastaNumPArams
+        sResult = sResult & "null" & sDelimiterOut
+        i = i + 1
+    Wend
+    sResult = Left(sResult, Len(sResult) - Len(sDelimiterOut))
+    LlenaParams = sResult
+        
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox "Error nº " & Err & vbCrLf & Err.Description
+    Resume HandleExit
+    
 End Function

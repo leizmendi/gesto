@@ -1,122 +1,135 @@
 Option Compare Database
 Option Explicit
 
-Public Function ComprobarCampos()
-    Dim fld As Field, strMsg As String
-    Dim rs As Recordset, y As Long, z As Long
-    On Error Resume Next
-    
-    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("WebBanco")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "WebBanco", dbText, 150) & vbCrLf
+Public Function ComprobarCampos(Optional strMDB As String = "Current")
+    Dim fld As dao.Field, strMsg As String, strMsg2 As String, tdf As TableDef
+    Dim strSQL As String, rs As Recordset, db As dao.Database
+    Dim db2 As dao.Database, tdf2 As TableDef, fld2 As dao.Field, strMDB2 As String
+    Dim bVerRelaciones As Boolean
+    Dim sPrefijoConexion As String
+    On Error GoTo HandleError
+    Set rs = CurrentDb.OpenRecordset("SELECT * FROM sysComprobarCampos ORDER By ID", dbOpenSnapshot)
+    If strMDB = "Current" Then
+        Set db = CurrentDb
+    Else
+        Set db = OpenDatabase(strMDB)
     End If
-    Set fld = CurrentDb.TableDefs("tbRecibosEmisiones").Fields("FicheroRemesa")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbRecibosEmisiones", "FicheroRemesa", dbText, 150) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("Nombre_Ordenante")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "Nombre_Ordenante", dbText, 40) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("NIF_Ordenante")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "NIF_Ordenante", dbText, 12) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("tbMisCuentas").Fields("Sufijo_Ordenante")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbMisCuentas", "Sufijo_Ordenante", dbText, 3) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("tbRecibos").Fields("CIF_Cliente")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbRecibos", "CIF_Cliente", dbText, 10) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("NumRecibo")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "NumRecibo", dbLong) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("PagoDomiciliadoSN")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "PagoDomiciliadoSN", dbBoolean) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("CodigoEntidad")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "CodigoEntidad", dbText, 4) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("CodigoSucursal")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "CodigoSucursal", dbText, 4) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("DigitoControl")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "DigitoControl", dbText, 2) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("NumeroCuenta")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "NumeroCuenta", dbText, 10) & vbCrLf
-    End If
-    
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("[RetencionIRPF%]")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "[RetencionIRPF%]", dbCurrency) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("BaseRetencionIRPF")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "BaseRetencionIRPF", dbCurrency) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("[RetencionIRPF%]")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "[RetencionIRPF%]", dbCurrency) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("Facturas cabeceras").Fields("TotalImporte")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Facturas cabeceras", "TotalImporte", dbCurrency) & vbCrLf
-        ' Marcar todas las facturas pagadas
-        Set rs = CurrentDb.OpenRecordset("SELECT [Nro Documento] FROM [Facturas cabeceras]", dbOpenSnapshot)
-        DoCmd.Hourglass True
-        If Not rs.EOF Then
-            rs.MoveLast
-            rs.MoveFirst
+    While Not rs.EOF
+        bVerRelaciones = False
+        If strMDB <> "Current" Then
+            On Error Resume Next
+            Set tdf = db.TableDefs(rs("NombreTabla"))
+            If Err <> 0 Then
+                On Error GoTo HandleError
+                If CreateTableDAO(db, rs("NombreTabla"), rs("NombreCampo")) Then
+                    bVerRelaciones = True
+                    GoTo Relaciones
+                Else
+                    MsgBox "No se pudo crear tabla " & rs("NombreTabla"), vbExclamation
+                    GoTo HandleExit
+                End If
+            End If
+            On Error GoTo HandleError
         End If
-        z = rs.RecordCount
-        While Not rs.EOF
-            PonTotalFactura rs("Nro Documento")
-            rs.MoveNext
-            y = y + 1
-            SysCmd acSysCmdSetStatus, "Grabando Importe de Facturas: " & y & "/" & z
-        Wend
-        SysCmd acSysCmdClearStatus
-        DoCmd.Hourglass False
-    End If
-    
-    Set fld = CurrentDb.TableDefs("Clientes").Fields("AgruparAlbaranesSN")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("Clientes", "AgruparAlbaranesSN", dbBoolean) & vbCrLf
-        CurrentDb.Execute "UPDATE Clientes SET AgruparAlbaranesSN = True", dbFailOnError + dbSeeChanges
-        strMsg = strMsg & EstablecerPropiedad("Clientes", "AgruparAlbaranesSN", "DefaultValue", True) & vbCrLf
-    End If
-    Set fld = CurrentDb.TableDefs("tbAlbaranesCab").Fields("CifFacturar")
-    If Err <> 0 Then
-        strMsg = strMsg & Añadir_Campo("tbAlbaranesCab", "CifFacturar", dbText, 20) & vbCrLf
-        EstablecerPropiedad "tbAlbaranesCab", "CifFacturar", "Required", True, True
-    End If
+        On Error Resume Next
+        Set fld = db.TableDefs(rs("NombreTabla")).Fields(rs("NombreCampo"))
+        If Err <> 0 Then '
+            On Error GoTo HandleError
+            strMsg2 = ""
+            sPrefijoConexion = Nz(DLookup("PrefijoConexion", "1MyConexionTablas", "NombreTabla = '" & rs("NombreTabla") & "'"), "")
+            If sPrefijoConexion = ";DATABASE=" Then
+                If Añadir_Campo(rs("NombreTabla"), rs("NombreCampo"), rs("TipoCampo"), rs("Tamaño"), strMsg2, strMDB) = True Then
+                    bVerRelaciones = True
+                    If Nz(rs("FuncionNext"), "") <> "" Then
+                        Call FuncionNext(rs("FuncionNext"))
+                    End If
+                End If
+                strMsg = strMsg & strMsg2 & vbCrLf
+            ElseIf sPrefijoConexion Like "ODBC;DRIVER=SQL Server;*" Then
+                If Añadir_Campo_SQL(rs("NombreTabla"), rs("NombreCampo"), rs("TipoCampo"), rs("Nullable"), rs("Tamaño"), strMsg2) = True Then
+                    bVerRelaciones = True
+                    If Nz(rs("FuncionNext"), "") <> "" Then
+                        Call FuncionNext(rs("FuncionNext"))
+                    End If
+                End If
+                strMsg = strMsg & strMsg2 & vbCrLf
+            Else
+                MsgBox "No implementado añadir campo para PrefijoConexion = " & sPrefijoConexion, vbExclamation
+            End If
+        End If
+Tamaño_del_Campoo:
+        If fld.Type = dbText And sPrefijoConexion = ";DATABASE=" Then
+            If fld.Size < rs("Tamaño") Then
+                If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & rs("NombreTabla") & "'") = True Then
+                    strMDB2 = DirectorioDe(CurrentDb.Name)
+                Else
+                    strMDB2 = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & rs("NombreTabla") & "'")
+                End If
+                strMDB2 = strMDB2 & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & rs("NombreTabla") & "'")
+                Set db2 = OpenDatabase(strMDB2, True)
+                            '----------------------------------------------------------------
+                            'Set tdf2 = db2.TableDefs(rs("NombreTabla"))
+                            'Set fld2 = tdf2.Fields(rs("NombreCampo"))
+                            'SetProperty fld2, "Size", dbText, rs("Tamaño")
+                            'Da error 3219 operacion no válida (?)---------------------------
+                strSQL = "ALTER TABLE " & rs("NombreTabla")
+                strSQL = strSQL & " ALTER COLUMN " & rs("NombreCampo") & " TEXT(" & rs("Tamaño") & ")"
+                db2.Execute strSQL, dbFailOnError
+                'MsgBox "Se debe aumentar el tamaño del campo " & UCase(rs("NombreCampo")) & " a " & rs("Tamaño") & " en la tabla " _
+                        & UCase(rs("NombreTabla")) & " de la base de datos: " & db2.Name
+            End If
+        End If
+Relaciones:
+        If bVerRelaciones Then
+            If Nz(rs("TablaPrincipalRelacion"), "") <> "" Then
+                If CreateRelationDAO(db, rs("NombreTabla"), rs("NombreCampo"), rs("TablaPrincipalRelacion"), rs("CampoPrincipalRelacion"), rs("Actualizar_en_Cascada"), rs("Borrr_en_Cascada"), rs("Uno_a_Uno")) = True Then
+                    strMsg = strMsg & "Se creó la Relacion entre " & rs("TablaPrincipalRelacion") & "." & rs("CampoPrincipalRelacion") & " y " & rs("NombreTabla") & "." & rs("NombreCampo") & vbCrLf
+                Else
+                    strMsg = strMsg & "No se pudo crear la Relacion entre " & rs("TablaPrincipalRelacion") & "." & rs("CampoPrincipalRelacion") & " y " & rs("NombreTabla") & "." & rs("NombreCampo") & vbCrLf
+                End If
+            End If
+        End If
+                
+SiguienteCampo:
+        rs.MoveNext
+    Wend
     If strMsg <> "" Then MsgBox strMsg
+HandleExit:
+    Exit Function
+HandleError:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en ComprobarCampos" & vbCrLf & Err.Description
+            Resume HandleExit
+    End Select
+
 End Function
 
-Public Function Añadir_Campo(strTabla As String, strNombreCampo As String, intTipo As Integer, Optional intSize As Integer = 0, Optional intMensajeSN As Integer = False) As String
+Public Function Añadir_Campo(strTabla As String, strNombreCampo As String, intTipo As Integer, Optional intSize As Integer = 0, Optional ByRef strMensaje As String, Optional strMDB As String = "Current", Optional strPropiedadXML As String = "", Optional strConnect As String = "") As Integer
 'Genera nuevos campos en "& strtabla &"
     On Error GoTo Error_Añadir_Campo
     
-    Dim db As DAO.Database, ws As Workspace, strMDB As String
-    Dim tdf As TableDef, fld As Field, ind As Index
+    Dim db As dao.Database, ws As Workspace
+    Dim tdf As TableDef, fld As dao.Field, ind As Index
+    Dim i As Integer
     On Error GoTo Error_Añadir_Campo
-    If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
-        strMDB = DirectorioDe(CurrentDb.Name)
-    Else
-        strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    If strMDB = "current" Then
+        If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
+            strMDB = DirectorioDe(CurrentDb.Name)
+        Else
+            strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+        End If
+        strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
     End If
-    strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    strConnect = Nz(DLookup("PrefijoConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'"), "")
+    i = InStr(strConnect, ";DATABASE")
+    If i > 1 Then
+        strConnect = Left(strConnect, i - 1)
+        i = InStr(strConnect, ";pwd=")
+        If i > 1 Then strConnect = Mid(strConnect, i)
+    End If
     Set ws = DBEngine.Workspaces(0)
-    Set db = ws.OpenDatabase(strMDB)
+    Set db = ws.OpenDatabase(strMDB, True, False, strConnect)
     
     Set tdf = db.TableDefs(strTabla)
     If intSize = 0 Then
@@ -124,80 +137,479 @@ Public Function Añadir_Campo(strTabla As String, strNombreCampo As String, intTi
     Else
         Set fld = tdf.CreateField(strNombreCampo, intTipo, intSize)
     End If
+    Dim strPropName As String, intPropType As Integer, vValor
+    strPropName = Nz(dimexml(strPropiedadXML, "Propiedad"), "")
     tdf.Fields.Append fld
+    If strPropName <> "" Then
+        intPropType = Nz(dimexml(strPropiedadXML, "Tipo"), 0)
+        vValor = Nz(dimexml(strPropiedadXML, "Valor"), "")
+        SetProperty fld, strPropName, intPropType, vValor
+    End If
+    
+    Set fld = Nothing
     Set tdf = Nothing
-    Añadir_Campo = "Se añadió el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+    db.Close
+    Set db = Nothing
+    
+    Set ws = Nothing
+    
+    strMensaje = "Se añadió el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+    Añadir_Campo = True
 Salir_Añadir_Campo:
     Exit Function
 Error_Añadir_Campo:
     Select Case Err
         Case Else
             MsgBox "Error nº " & Err & " en Añadir_Campo" & vbCrLf & Err.Description
-            Añadir_Campo = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+            strMensaje = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+
+            On Error Resume Next
+            db.Close
+            Añadir_Campo = False
             Resume Salir_Añadir_Campo
     End Select
 End Function
 
-Public Function EstablecerPropiedad(strTabla As String, strNombreCampo As String, strPropiedad As String, vValue As Variant, Optional intMensajeSN As Integer = False) As String
+Public Function Quitar_Campo(strTabla As String, strNombreCampo As String, Optional ByRef strMensaje As String, Optional strMDB As String = "Current") As Integer
 'Genera nuevos campos en "& strtabla &"
-    On Error GoTo Error_EstablecerPropiedad
+    On Error GoTo Error_Quitar_Campo
     
-    Dim db As DAO.Database, ws As Workspace, strMDB As String
-    Dim tdf As TableDef, fld As Field, ind As Index, prp As Property
-    On Error GoTo Error_EstablecerPropiedad
-    If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
-        strMDB = DirectorioDe(CurrentDb.Name)
-    Else
-        strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+    Dim db As dao.Database, ws As Workspace
+    Dim tdf As TableDef, fld As dao.Field, ind As Index
+    On Error GoTo Error_Quitar_Campo
+    If strMDB = "current" Then
+        If DLookup("DirectorioActual", "1myConexionTablas", "NombreTabla = '" & strTabla & "'") = True Then
+            strMDB = DirectorioDe(CurrentDb.Name)
+        Else
+            strMDB = DLookup("DirectorioDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
+        End If
+        strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
     End If
-    strMDB = strMDB & DLookup("FicheroDeConexion", "1myConexionTablas", "NombreTabla = '" & strTabla & "'")
     Set ws = DBEngine.Workspaces(0)
     Set db = ws.OpenDatabase(strMDB)
     
     Set tdf = db.TableDefs(strTabla)
-    Set fld = tdf(strNombreCampo)
-    Set prp = fld.Properties(strPropiedad)
-    prp.value = vValue
-    EstablecerPropiedad = "Se asignó el valor " & vValue & "para la propiedad " & strPropiedad & " del campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
-Salir_EstablecerPropiedad:
+    tdf.Fields.Delete strNombreCampo
+    Set tdf = Nothing
+    strMensaje = "Se eliminó el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+    Quitar_Campo = True
+Salir_Quitar_Campo:
     Exit Function
-Error_EstablecerPropiedad:
+Error_Quitar_Campo:
     Select Case Err
         Case Else
-            MsgBox "Error nº " & Err & " en EstablecerPropiedad" & vbCrLf & Err.Description
-            EstablecerPropiedad = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
-            Resume Salir_EstablecerPropiedad
+            MsgBox "Error nº " & Err & " en Quitar_Campo" & vbCrLf & Err.Description
+            strMensaje = "NO se pudo añadir el campo " & strNombreCampo & " en la tabla " & strTabla & " en " & strMDB
+            Quitar_Campo = False
+            Resume Salir_Quitar_Campo
     End Select
 End Function
 
-Public Sub PonTotalFactura(lngNroFactura As Long)
-    On Error GoTo Error_PonTotalFactura
-    Dim strSQL As String, curTotal As Currency, curBaseRet As Currency
-    curTotal = Nz(DSum("[Precio]*(1+[%IVA]/100)", "Facturas lineas", "[Nro Documento] = " & lngNroFactura), 0)
-    curTotal = Round(curTotal, 2)
-    curBaseRet = Nz(DSum("[Precio]", "Facturas lineas", "[Nro Documento] = " & lngNroFactura & " AND [%IVA]<>0"), 0)
-    curBaseRet = Round(curBaseRet, 2)
-    strSQL = "UPDATE [Facturas cabeceras] SET [Facturas cabeceras].TotalImporte = " & ComaPunto(curTotal)
-    strSQL = strSQL & ", BaseRetencionIRPF = " & ComaPunto(curBaseRet)
-    strSQL = strSQL & " WHERE ((([Facturas cabeceras].[Nro Documento])=" & lngNroFactura & "));"
-    CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
-Salir_PonTotalFactura:
-    Exit Sub
-Error_PonTotalFactura:
-    Select Case Err
-        Case Else
-            MsgBox "Error nº " & Err & " en PonTotalFactura" & vbCrLf & Err.Description
-            Resume Salir_PonTotalFactura
-    End Select
+
+Sub SetProperty(fldTemp As dao.Field, strName As String, intType As Integer, valor As Variant)
+
+   Dim prpNew As Property
+   Dim errLoop As Error
+
+   ' Attempt to set the specified property.
+   On Error GoTo Err_Property
+   fldTemp.Properties(strName) = valor
+   On Error GoTo 0
+Salir_SetProperty:
+   Exit Sub
+
+Err_Property:
+
+   ' Error 3270 means that the property was not found.
+   If DBEngine.Errors(0).Number = 3270 Then
+      ' Create property, set its value, and append it to the
+      ' Properties collection.
+      Set prpNew = fldTemp.CreateProperty(strName, intType, valor)
+      fldTemp.Properties.Append prpNew
+      Resume Next
+   Else
+      ' If different error has occurred, display message.
+      For Each errLoop In DBEngine.Errors
+         MsgBox "Error number: " & errLoop.Number & vbCr & _
+            errLoop.Description
+            Resume Salir_SetProperty
+      Next errLoop
+      End
+   End If
+
 End Sub
 
-Public Function ComaPunto(ByVal vStr As Variant) As Variant
-Dim i As Integer
-Bucle:
-    i = InStr(i + 1, vStr, ",")
-    If i > 0 Then
-        Mid(vStr, i, 1) = "."
-        GoTo Bucle
-    End If
-    ComaPunto = vStr
+Private Function FuncionNext(sFuncionNext As String)
+    On Error GoTo HandleError
+    Select Case sFuncionNext
+        Case "Localidades_de_Presupuesto_a_IdProyecto_All": Call Localidades_de_Presupuesto_a_IdProyecto_All
+        Case "Actuaciones_de_Presupuesto_a_IdProyecto_All": Call Actuaciones_de_Presupuesto_a_IdProyecto_All
+    End Select
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
 End Function
+
+
+
+'Procedimiento para actualizar los datos de GD_Proyecto_Presupuesto_Localidades asignando el nuevo campo IdProyecto y poder así modificar las relaciones entre tablas.
+'Ahora se enlaza desde GD_Proyectos a GD_Proyecto_Presupuesto_Localidades directamente sin pasar por GD_Proyecto_Presupuestos
+'Lo mismo con las actuaciones
+
+
+Private Sub Localidades_de_Presupuesto_a_IdProyecto(lIdProyecto As Long, ByRef X As Long, ByRef z As Long)
+    On Error GoTo HandleError
+    Dim rs As Recordset, sSQL As String, sAntCodLoc As String, lIdPro_Pto_Localidad As Long
+    sSQL = "SELECT IdPro_Pto_Localidad, CodLocalidad, Localidad, Municipio, GD_Proyecto_Presupuesto_Localidades.IdProyecto" & _
+           " FROM GD_Proyecto_Presupuestos INNER JOIN GD_Proyecto_Presupuesto_Localidades ON GD_Proyecto_Presupuestos.IdPresupuesto = GD_Proyecto_Presupuesto_Localidades.IdPresupuesto" & _
+           " WHERE GD_Proyecto_Presupuestos.IdProyecto = " & lIdProyecto & _
+           " ORDER BY CodLocalidad, Localidad, Municipio;"
+    Set rs = CurrentDb.OpenRecordset(sSQL, dbOpenDynaset, dbSeeChanges)
+    While Not rs.EOF
+        rs.Edit
+        If sAntCodLoc <> rs("CodLocalidad") & rs("Localidad") & rs("Municipio") Then
+            rs("IdProyecto") = lIdProyecto
+            sAntCodLoc = rs("CodLocalidad") & rs("Localidad") & rs("Municipio")
+            lIdPro_Pto_Localidad = rs("IdPro_Pto_Localidad")
+            X = X + 1
+        Else
+            rs("IdProyecto") = -1
+            z = z + 1
+        End If
+        rs.Update
+        sSQL = "UPDATE GD_Proyecto_Presupuesto_Detalle SET IdPro_Pto_Localidad = " & lIdPro_Pto_Localidad & " WHERE IdPro_Pto_Localidad = " & rs("IdPro_Pto_Localidad")
+        CurrentDb.Execute sSQL, dbFailOnError
+        rs.MoveNext
+    Wend
+    sSQL = "DELETE * FROM GD_Proyecto_Presupuesto_Localidades WHERE IdProyecto = -1"
+    CurrentDb.Execute sSQL, dbFailOnError
+HandleExit:
+    Exit Sub
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Sub
+
+Private Sub Actuaciones_de_Presupuesto_a_IdProyecto(lIdProyecto As Long, ByRef X As Long, ByRef z As Long)
+    On Error GoTo HandleError
+    Dim rs As Recordset, sSQL As String, sAntAct As String, lIdPro_Pto_Actuacion As Long
+    sSQL = "SELECT GD_Proyecto_Presupuestos.IdPresupuesto, IdPro_Pto_Actuacion, CodActuacion, Actuacion, GD_Proyecto_Presupuesto_Actuacion.IdProyecto" & _
+           " FROM GD_Proyecto_Presupuestos INNER JOIN GD_Proyecto_Presupuesto_Actuacion ON GD_Proyecto_Presupuestos.IdPresupuesto = GD_Proyecto_Presupuesto_Actuacion.IdPresupuesto" & _
+           " WHERE GD_Proyecto_Presupuestos.IdProyecto = " & lIdProyecto & _
+           " ORDER BY GD_Proyecto_Presupuesto_Actuacion.CodActuacion, GD_Proyecto_Presupuesto_Actuacion.Actuacion;"
+
+    Set rs = CurrentDb.OpenRecordset(sSQL, dbOpenDynaset, dbSeeChanges)
+    While Not rs.EOF
+        rs.Edit
+        If sAntAct <> Nz(rs("CodActuacion"), "") & "-" & Nz(rs("Actuacion"), "") Then
+            rs("IdProyecto") = lIdProyecto
+            sAntAct = Nz(rs("CodActuacion"), "") & "-" & Nz(rs("Actuacion"), "")
+            lIdPro_Pto_Actuacion = rs("IdPro_Pto_Actuacion")
+            X = X + 1
+        Else
+            rs("IdProyecto") = -1
+            z = z + 1
+        End If
+        rs.Update
+        sSQL = "UPDATE GD_Proyecto_Presupuesto_Detalle SET IdPro_Pto_Actuacion = " & lIdPro_Pto_Actuacion & " WHERE IdPro_Pto_Actuacion = " & rs("IdPro_Pto_Actuacion")
+        CurrentDb.Execute sSQL, dbFailOnError
+        rs.MoveNext
+    Wend
+    sSQL = "DELETE * FROM GD_Proyecto_Presupuesto_Actuacion WHERE IdProyecto = -1"
+    CurrentDb.Execute sSQL, dbFailOnError
+HandleExit:
+    Exit Sub
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Sub
+
+Private Sub Localidades_y_Actuaciones_de_Presupuesto_a_IdProyecto_All(Optional iSoloUnPaso As Integer = -1)
+    On Error GoTo HandleError
+    Dim rs As Recordset, Y(1) As Long, X(1) As Long, z(1) As Long, iR As Integer, iPaso As Integer
+    Dim sMsg As String
+    iR = MsgBox("¿Has hecho copia de seguridad de Gendocs_dat.accdb por si acaso?", vbYesNoCancel + vbDefaultButton3 + vbQuestion)
+    If iR <> vbYes Then GoTo HandleExit
+    Set rs = CurrentDb.OpenRecordset("SELECT IdProyecto FROM GD_Proyectos", dbOpenSnapshot)
+    If iSoloUnPaso <> -1 Then iPaso = iSoloUnPaso
+OtraVez:
+    While Not rs.EOF
+        DoEvents
+        Y(iPaso) = Y(iPaso) + 1
+        If iPaso = 0 Then
+            SysCmd acSysCmdSetStatus, "Actualizando _Presupuesto_Localidades " & Y(iPaso)
+            Localidades_de_Presupuesto_a_IdProyecto rs("IdProyecto"), X(iPaso), z(iPaso)
+        Else
+            SysCmd acSysCmdSetStatus, "Actualizando _Presupuesto_Actuaciones " & Y(iPaso)
+            Actuaciones_de_Presupuesto_a_IdProyecto rs("IdProyecto"), X(iPaso), z(iPaso)
+        End If
+        rs.MoveNext
+    Wend
+    If iPaso = 0 Then
+        sMsg = "Se repasaron " & Y(0) & " Proyectos, se actualizaron " & X(0) & " Localidades, se eliminaron " & z(0) & vbCrLf
+    Else
+        sMsg = sMsg & "Se repasaron " & Y(1) & " Proyectos, se actualizaron " & X(1) & " Actuaciones, se eliminaron " & z(1)
+    End If
+    If iPaso = 0 And iSoloUnPaso = -1 Then
+        rs.MoveFirst
+        iPaso = 1
+        GoTo OtraVez
+    End If
+    SysCmd acSysCmdClearStatus
+    MsgBox sMsg, vbInformation
+    MsgBox "Ahora se debería establecer nuevas relaciones entre las tablas GD_Proyectos y GD_Proyecto_Presupuesto_Localidades y eliminar la existente entre GD_Proyecto_Presupuestos y GD_Proyecto_Presupuesto_Localidades" & vbCrLf & _
+            " Y lo mismo con las actuaciones", vbInformation
+    Set rs = Nothing
+    Dim db As dao.Database, sDB As String
+    sDB = DLookup("[DirectorioDeConexion] & [FicheroDeConexion]", "1myConexionTablas", "NombreTabla = " & ConComillas("GD_Proyectos"))
+    Set db = OpenDatabase(sDB)
+    If iSoloUnPaso = -1 Or iSoloUnPaso = 0 Then
+        If CreateRelationDAO(db, "GD_Proyectos", "IdProyecto", "GD_Proyecto_Presupuesto_Localidades", "IdProyecto") = True Then
+            MsgBox "Se creó relación entre GD_Proyectos y GD_Proyecto_Presupuesto_Localidades", vbInformation
+        Else
+            MsgBox "No se pudo crear relación entre GD_Proyectos y GD_Proyecto_Presupuesto_Localidades", vbExclamation
+        End If
+        If DeleteRelationDAO(db, "GD_Proyecto_Presupuestos", "IdPresupuesto", "GD_Proyecto_Presupuesto_Localidades", "IdPresupuesto") = True Then
+            MsgBox "Se eliminó la relación entre GD_Proyecto_Presupuestos.IdPresupuesto y GD_Proyecto_Presupuesto_Localidades.IdPresupuesto", vbInformation
+        Else
+            MsgBox "No se pudo eliminar la relación entre GD_Proyecto_Presupuestos.IdPresupuesto y GD_Proyecto_Presupuesto_Localidades.IdPresupuesto", vbInformation
+        End If
+    End If
+    If iSoloUnPaso = -1 Or iSoloUnPaso = 1 Then
+        If CreateRelationDAO(db, "GD_Proyectos", "IdProyecto", "GD_Proyecto_Presupuesto_Actuacion", "IdProyecto") = True Then
+            MsgBox "Se creó relación entre GD_Proyectos y GD_Proyecto_Presupuesto_Actuacion", vbInformation
+        Else
+            MsgBox "No se pudo crear relación entre GD_Proyectos y GD_Proyecto_Presupuesto_Actuacion", vbExclamation
+        End If
+        If DeleteRelationDAO(db, "GD_Proyecto_Presupuestos", "IdPresupuesto", "GD_Proyecto_Presupuesto_Actuacion", "IdPresupuesto") = True Then
+            MsgBox "Se eliminó la relación entre GD_Proyecto_Presupuestos.IdPresupuesto y GD_Proyecto_Presupuesto_Actuacion.IdPresupuesto", vbInformation
+        Else
+            MsgBox "No se pudo eliminar la relación entre GD_Proyecto_Presupuestos.IdPresupuesto y GD_Proyecto_Presupuesto_Actuacion.IdPresupuesto", vbInformation
+        End If
+    End If
+HandleExit:
+    Exit Sub
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Sub
+
+Private Function Localidades_de_Presupuesto_a_IdProyecto_All()
+    Localidades_y_Actuaciones_de_Presupuesto_a_IdProyecto_All 0
+End Function
+
+Private Function Actuaciones_de_Presupuesto_a_IdProyecto_All()
+    Localidades_y_Actuaciones_de_Presupuesto_a_IdProyecto_All 1
+End Function
+
+Function CreateTableDAO(db As dao.Database, sTableName As String, sKeyFieldName As String)
+    'El Campo que se genera será el campo Clave, autonumérico
+    On Error GoTo HandleError
+    Dim tdf As dao.TableDef
+    Dim fld As dao.Field
+    
+    Set tdf = db.CreateTableDef(sTableName)
+    
+    'Specify the fields.
+    With tdf
+        'AutoNumber: Long with the attribute set.
+        Set fld = .CreateField(sKeyFieldName, dbLong)
+        fld.Attributes = dbAutoIncrField + dbFixedField
+        .Fields.Append fld
+    End With
+    
+    'Save the Contractor table.
+    db.TableDefs.Append tdf
+    Set fld = Nothing
+    Set tdf = Nothing
+    CreateTableDAO = True
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+Function CreateRelationDAO(db As dao.Database, sTable1 As String, sField1 As String, _
+                                               sTable2 As String, sField2 As String, _
+                                               Optional bUpdateCascade As Boolean = True, _
+                                               Optional bDeleteCascade As Boolean = True, _
+                                               Optional bUnique As Boolean = False) As Boolean
+    On Error GoTo HandleError
+    'Dim db As DAO.Database
+    Dim rel As dao.Relation
+    Dim fld As dao.Field
+    Dim lAttributes As Long
+    
+    'Initialize
+    'Set db = CurrentDb()
+    
+    'Create a new relation.
+    Set rel = db.CreateRelation(sTable1 & "_" & sTable2)
+    
+    'Define its properties.
+    With rel
+        'Specify the primary table.
+        .Table = sTable1
+        'Specify the related table.
+        .ForeignTable = sTable2
+        'Specify attributes for cascading updates and deletes.
+        If bUpdateCascade Or bDeleteCascade Then
+            lAttributes = IIf(bUpdateCascade, dbRelationUpdateCascade, 0) + IIf(bDeleteCascade, dbRelationDeleteCascade, 0)
+        ElseIf bUnique Then
+            lAttributes = dbRelationUnique
+        Else
+            lAttributes = dbRelationDontEnforce
+        End If
+        .Attributes = lAttributes
+        
+        'Add the fields to the relation.
+        'Field name in primary table.
+        Set fld = .CreateField(sField1)
+        'Field name in related table.
+        fld.ForeignName = sField2
+        'Append the field.
+        .Fields.Append fld
+        
+        'Repeat for other fields if a multi-field relation.
+    End With
+    
+    'Save the newly defined relation to the Relations collection.
+    db.Relations.Append rel
+    
+    'Clean up
+    Set fld = Nothing
+    Set rel = Nothing
+    'Set db = Nothing
+    Debug.Print "Relation created."
+    CreateRelationDAO = True
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+
+Function DeleteRelationDAO(db As dao.Database, sTable1 As String, sField1 As String, _
+                                               sTable2 As String, sField2 As String) As Boolean
+    On Error GoTo HandleError
+    Dim rel As dao.Relation
+    Dim fld As dao.Field
+    Dim bBorrada As Boolean
+    
+    For Each rel In db.Relations
+        If rel.Table = sTable1 And rel.ForeignTable = sTable2 Then
+            For Each fld In rel.Fields
+                If fld.Name = sField1 And fld.ForeignName = sField2 Then
+                    db.Relations.Delete rel.Name
+                    bBorrada = True
+                    Exit For
+                End If
+            Next fld
+        End If
+    Next rel
+    DeleteRelationDAO = bBorrada
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+
+Public Function foo()
+    Dim db As dao.Database, sDB As String
+    sDB = DLookup("[DirectorioDeConexion] & [FicheroDeConexion]", "1myConexionTablas", "NombreTabla = " & ConComillas("GD_Proyectos"))
+    Set db = OpenDatabase(sDB)
+    CreateRelationDAO db, "GD_Proyectos", "IdProyecto", "GD_Proyecto_Medicion_Presupuesto", "IdProyecto"
+End Function
+
+
+Public Function Añadir_Campo_SQL(sTabla As String, _
+                                 sCampo As String, _
+                                 iTipoCampo As Integer, _
+                                 bNullable As Boolean, _
+                                 Optional iSize As Integer = 0, _
+                                 Optional ByRef strMensaje As String _
+                                 ) As Integer
+                                 'Optional strMDB As String = "Current", Optional strPropiedadXML As String = "", Optional strConnect As String = ""
+
+'Genera nuevos campos en "& sTabla &"
+    On Error GoTo HandleError
+    
+    Dim sSQL As String, sConnect As String, sTipoSQL As String
+    Dim i As Integer, sDB As String
+    On Error GoTo HandleError
+    sConnect = DLookup("[PrefijoConexion] & [FicheroDeConexion]", "1MyConexionTablas", "NombreTabla = '" & sTabla & "'")
+    sDB = DLookup("[FicheroDeConexion]", "1MyConexionTablas", "NombreTabla = '" & sTabla & "'")
+    Select Case iTipoCampo
+        Case 1: sTipoSQL = "BIT"
+        Case 4: sTipoSQL = "INT"
+        Case 5: sTipoSQL = "MONEY"
+        Case 6: sTipoSQL = "FLOAT"
+        Case 8: sTipoSQL = "DATETIME2"
+        Case 10: sTipoSQL = "VARCHAR(" & iSize & ")"
+        Case 12: sTipoSQL = "VARCHAR(MAX)"
+    End Select
+    sSQL = "ALTER TABLE " & sTabla & _
+           " ADD " & sCampo & _
+           " " & sTipoSQL
+           '" " & IIf(bNullable, "NULL", "NOT NULL")
+    Dim bResult As Boolean
+    Q_p_t sSQL, sConnect, False, True, bResult
+    If bResult Then
+        AttachDSNLessTable sTabla, "dbo." & sTabla, DVEM(sConnect, ";SERVER=", ";"), DVEM(sConnect, ";DATABASE=", ""), DVEM(sConnect, ";UID=", ";"), DVEM(sConnect, ";PWD=", ";")
+        strMensaje = "Se añadió el campo " & sCampo & " en la tabla " & sTabla & " en " & sDB
+        
+    Else
+        strMensaje = "No se añadió el campo " & sCampo & " en la tabla " & sTabla & " en " & sDB
+    End If
+    Añadir_Campo_SQL = bResult
+HandleExit:
+    Exit Function
+HandleError:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en Añadir_Campo_SQL" & vbCrLf & Err.Description
+            strMensaje = "NO se pudo añadir el campo " & sCampo & " en la tabla " & sTabla & " en " & sDB
+
+            On Error Resume Next
+            Añadir_Campo_SQL = False
+            Resume HandleExit
+    End Select
+End Function
+
+Function DVEM(sTexto As String, _
+              sMarcaIni As String, _
+              sMarcaFin As String, _
+              Optional iStart As Integer = 1) As String
+'Function DimeValorEntreMarcas(sTexto As String, _
+                              sMarcaIni As String, _
+                              sMarcaFin As String, _
+                              Optional iStart As Integer = 1) As String
+    On Error GoTo HandleError
+    Dim i As Integer, j As Integer, sR As String
+    i = InStr(iStart, sTexto, sMarcaIni)
+    If i > 0 Then
+        i = i + Len(sMarcaIni)
+        If sMarcaFin = "" Then
+            sR = Mid(sTexto, i)
+        Else
+            j = InStr(i, sTexto, sMarcaFin)
+            If j > 0 Then sR = Mid(sTexto, i, j - i)
+        End If
+    End If
+    DVEM = sR
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+
+                              End Function

@@ -87,9 +87,29 @@ Error_Crear_Tabla:
     End Select
 End Sub
 
-Public Sub ReconectarTablasSQLServer(sServer As String, sDB As String, sUser As String, sPass As String)
+Public Sub ReconectarTablasSQLServer(Optional sServer As String = "" _
+                                   , Optional sDB As String = "" _
+                                   , Optional sUser As String = "-" _
+                                   , Optional sPass As String = "-")
     On Error GoTo HandleError
     Dim rs As Recordset, i As Integer, j As Integer
+    If sServer = "" Then
+        sServer = Nz(myinputbox("Servidor de Base de datos SQL Server", "Servidor"), "")
+        If sServer = "" Then GoTo HandleExit
+    End If
+    If sDB = "" Then
+        sDB = Nz(myinputbox("Base de datos", "Base de datos", "Gesto"), "")
+        If sDB = "" Then GoTo HandleExit
+    End If
+    If sUser = "-" Then
+        sUser = Nz(myinputbox("User", "User", ""), "-")
+        If sUser = "-" Then GoTo HandleExit
+    End If
+    If sPass = "-" Then
+        sPass = Nz(myinputbox("Contraseña", "Contraseña", "", "Password"), "-")
+        If sPass = "-" Then GoTo HandleExit
+    End If
+    
     Set rs = CurrentDb.OpenRecordset("SELECT * FROM 1myConexionTablas" _
                                 & " WHERE PrefijoConexion Like 'ODBC;DRIVER=SQL Server*'", dbOpenSnapshot)
     rs.MoveLast
@@ -105,6 +125,7 @@ Public Sub ReconectarTablasSQLServer(sServer As String, sDB As String, sUser As 
         rs.MoveNext
     Wend
     rs.MoveFirst
+    i = 0
     While Not rs.EOF
         DoEvents
         i = i + 1
@@ -133,5 +154,9 @@ Public Function pepe()
     'AttachDSNLessTable "Renovación de Permisos", "dbo.Renovación de Permisos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
     'AttachDSNLessTable "Facturas lineas", "dbo.Facturas lineas", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
     'AttachDSNLessTable "Renovación Otros Documentos", "dbo.Renovación Otros Documentos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
-    AttachDSNLessTable "Facturas cabeceras", "dbo.Facturas cabeceras", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "142857Gest0"
+    'AttachDSNLessTable "Facturas cabeceras", "dbo.Facturas cabeceras", "PCSERVIDOR\SQLEXPRESS", "Gesto", "userGesto", "635T0r14"
+    'AttachDSNLessTable "Revisión de Vehículos", "dbo.Revisión de Vehículos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "635T0r14"
+    'ReconectarTablasSQLServer "PCSERVIDOR\SQLEXPRESS", "Gesto", "userGesto", "635Y0r14"
+    'AttachDSNLessTable "Bancos", "dbo.Bancos", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "userGesto", "635T0r14"
+    AttachDSNLessTable "tbGestorias", "dbo.tbGestorias", "DESKTOP-K36ELVC\SQLEXPRESS", "Gesto", "", ""
 End Function

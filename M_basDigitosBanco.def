@@ -41,3 +41,198 @@ Function dcbank2(Serie)
             dcbank2 = 11 - (l Mod 11)
     End Select
 End Function
+
+
+Function GeneradorIBAN(Pais As String, CCC As String, Optional intCompleto_Solo2digitos_SoloIBAN As Integer = 1) As String
+    On Error GoTo HandleError
+    'En el parametro Pais indicamos el código internacional del pais con 2 letras (ES para España)
+    'En el segundo parametro CCC señalamos el Codigo Cuenta Cliente (el número de cuenta)
+    If Pais = "" Then Pais = "ES"
+    Dim Letras As String, IBAN As String
+    Dim Dividendo As Integer, Resto As Integer, i As Integer
+    
+    'Eliminamos los posibles espacios dados en la cuenta
+    CCC = Replace(Trim(CCC), " ", "")
+    CCC = Replace(Trim(CCC), "-", "")
+    If Len(CCC) <> 20 Then
+        MsgBox "El nº de cuenta debe teber 20 dígitos", vbExclamation
+        GoTo HandleExit
+    End If
+    If Not IsNumeric(CCC) Then
+        MsgBox "El nº de cuenta no es numérico (acepta espacios y/o guiones)", vbExclamation
+        GoTo HandleExit
+    End If
+    
+     
+    'Calculamos el valor de las letras del País, quitamos y añadimos el valor al final
+    'serán E=14 y S=28 y acabado en dos ceros... ([CCC]142800)
+    'La equivalencia corresponde a A=10, B=11, C=12, ..., Y=34, Z=35
+    Letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    IBAN = CCC & CStr(InStr(1, Letras, Left(Pais, 1)) + 9) & CStr(InStr(1, Letras, Right(Pais, 1)) + 9) & "00"
+     
+    'recorremos todos los 26 caracteres del número dado ([CCC]142800)
+    For i = 1 To Len(IBAN)
+        Dividendo = Resto & Mid(IBAN, i, 1)
+        Resto = Dividendo Mod 97
+    Next i
+     
+    'devolvemos el IBAN generado a la hoja de cálculo
+    'compuesto por el texto 'IBAN', seguido del código de País informado, el Dígito Control del IBAN, y
+    'el CCC del inicio (que no cambia):
+    If intCompleto_Solo2digitos_SoloIBAN = 1 Then
+        GeneradorIBAN = "IBAN " & Pais & Format((98 - Resto), "00") & CCC
+    ElseIf intCompleto_Solo2digitos_SoloIBAN = 2 Then
+        GeneradorIBAN = Format((98 - Resto), "00")
+    Else
+        GeneradorIBAN = Pais & Format((98 - Resto), "00")
+    End If
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function
+
+'*******************************************************************************
+'* VerificaDigitoControlCCC
+'* Verifica el digito de control del número pasado como argumento (CCC: Código
+'* Cuenta Cliente)
+'* basado en normas y procedimientos bancarios de la ASOCIACION ESPAÑOLA DE BANCA
+'* cuaderno 19)
+'* Argumentos: strNumero => cadena de veinte números que representa el par
+'*                          entidad-Oficina, los dos digitos de control y el
+'*                          número de cuenta corriente
+'* uso: if VerificaDigitoControlCCC "00720101930000122351" then
+'* ESH 04/12/03 19:10
+'*******************************************************************************
+ 
+ 
+Public Function VerificaDigitoControlCCC(strNumero As String, Optional intMensaje As Integer = False) As Boolean
+   
+    ' pesos de los distintos digitos del CCC
+    Const Unidad = 6
+    Const Decena = 3
+    Const Centena = 7
+    Const UnidadMillar = 9
+    Const DecenaMillar = 10
+    Const CentenaMillar = 5
+    Const UnidadMillon = 8
+    Const DecenaMillon = 4
+    Const CentenaMillon = 2
+    Const Millardo = 1
+   
+    Dim lngTotal As Long, _
+        bytDigitoControl As Byte
+   
+    On Error GoTo VerificaDigitoControlCCC_TratamientoErrores
+    strNumero = Replace(Trim(strNumero), " ", "")
+    strNumero = Replace(Trim(strNumero), "-", "")
+    If Len(strNumero) <> 20 Then
+        MsgBox "El nº de cuenta debe tener 20 dígitos", vbExclamation
+        GoTo VerificaDigitoControlCCC_Salir
+    End If
+    If Not IsNumeric(strNumero) Then
+        MsgBox "El nº de cuenta no es numérico (acepta espacios y/o guiones)", vbExclamation
+        GoTo VerificaDigitoControlCCC_Salir
+    End If
+   
+    ' Para la obtención de cada uno de ellos, se utiliza el módulo 11:
+    ' la suma de los productos obtenidos al multiplicar cada una de las
+    ' cifras componentes de los elementos por los pesos asignados, se
+    ' divide entre 11; el resto de tal división se deduce de 11,
+    ' cuyo resultado es el dígito de control, con las excepciones
+    ' siguientes: si fuese 10, se considerará 1, y si fuera 11, cero.
+   
+    VerificaDigitoControlCCC = True
+   
+    ' primero compruebo el par entidad / oficina
+    lngTotal = Mid(strNumero, 8, 1) * Unidad + _
+               Mid(strNumero, 7, 1) * Decena + _
+               Mid(strNumero, 6, 1) * Centena + _
+               Mid(strNumero, 5, 1) * UnidadMillar + _
+               Mid(strNumero, 4, 1) * DecenaMillar + _
+               Mid(strNumero, 3, 1) * CentenaMillar + _
+               Mid(strNumero, 2, 1) * UnidadMillon + _
+               Mid(strNumero, 1, 1) * DecenaMillon
+    bytDigitoControl = 11 - (lngTotal Mod 11)
+   
+    If bytDigitoControl = 11 Then
+        bytDigitoControl = 0
+    ElseIf bytDigitoControl = 10 Then
+        bytDigitoControl = 1
+    End If
+   
+    ' si el digito de control de oficina no es correcto
+    If bytDigitoControl <> Mid(strNumero, 9, 1) Then VerificaDigitoControlCCC = False
+   
+    ' luego el número de cuenta
+    lngTotal = Mid(strNumero, 20, 1) * Unidad + _
+               Mid(strNumero, 19, 1) * Decena + _
+               Mid(strNumero, 18, 1) * Centena + _
+               Mid(strNumero, 17, 1) * UnidadMillar + _
+               Mid(strNumero, 16, 1) * DecenaMillar + _
+               Mid(strNumero, 15, 1) * CentenaMillar + _
+               Mid(strNumero, 14, 1) * UnidadMillon + _
+               Mid(strNumero, 13, 1) * DecenaMillon + _
+               Mid(strNumero, 12, 1) * CentenaMillon + _
+               Mid(strNumero, 11, 1) * Millardo
+   
+    bytDigitoControl = 11 - (lngTotal Mod 11)
+   
+    If bytDigitoControl = 11 Then
+        bytDigitoControl = 0
+    ElseIf bytDigitoControl = 10 Then
+        bytDigitoControl = 1
+    End If
+   
+    ' si el digito de control de cuenta no es correcto y según si lo era o no
+    ' el de oficina muestro un mensaje
+    If bytDigitoControl <> Mid(strNumero, 10, 1) Then VerificaDigitoControlCCC = False
+   
+    ' si alguno de los dos ha fallado muestro un mensaje
+    If (Not VerificaDigitoControlCCC And intMensaje) Then Call MsgBox("El CCC " & strNumero & " pasado no es correcto, por favor verifiquelo", vbCritical Or vbSystemModal, "ATENCION")
+   
+VerificaDigitoControlCCC_Salir:
+    On Error GoTo 0
+    Exit Function
+   
+VerificaDigitoControlCCC_TratamientoErrores:
+   
+    MsgBox "Error " & Err.Number & " en proc. VerificaDigitoControlCCC de Módulo DigitosControlCCC (" & Err.Description & ")", vbOKOnly + vbCritical
+    GoTo VerificaDigitoControlCCC_Salir
+End Function            ' VerificaDigitoControlCCC
+
+
+
+Public Function VerificaCuentaIBAN(sIBAN As String) As Boolean
+    'sIBAN debe estar en el formato AA0000000000000000000000
+    On Error GoTo HandleError
+    Dim strCCC As String, sCuenta As String
+    VerificaCuentaIBAN = False
+    If Len(sIBAN) < 24 Then
+        MsgBox "El IBAN " & sIBAN & " no es correcto"
+        GoTo HandleExit
+    Else
+    End If
+    strCCC = Mid(sIBAN, 5)
+    If VerificaDigitoControlCCC(strCCC, True) = False Then
+        GoTo HandleExit
+    End If
+    Dim strIBAN As String
+    strIBAN = GeneradorIBAN(Mid(sIBAN, 1, 2), strCCC, 2)
+    If Trim(Mid(sIBAN, 3, 2)) = "" Then
+        sIBAN = Mid(sIBAN, 1, 2) & strIBAN & Mid(sIBAN, 5)
+    Else
+        If Mid(sIBAN, 3, 2) <> strIBAN Then
+            MsgBox "El IBAN " & sIBAN & " no es correcto", vbExclamation ', según el cálculo realizado debería ser " & mId(siban, 1, 2) & strIBAN, vbExclamation
+            GoTo HandleExit
+        End If
+    End If
+    VerificaCuentaIBAN = True
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
+End Function

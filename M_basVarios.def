@@ -376,3 +376,8 @@ HandleError:
     Resume HandleExit
     
 End Function
+
+
+Public Function ComaPunto(ByVal vStr As Variant) As Variant
+    ComaPunto = Replace(CStr(vStr), ",", ".")
+End Function

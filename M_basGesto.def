@@ -44,3 +44,24 @@ Public Function RowSourceMeses(Optional bIncluirTodos As Boolean = True) As Stri
                     & "11;Noviembre;" _
                     & "12;Diciembre"
 End Function
+
+Public Sub PonTotalFactura(lngNroFactura As Long)
+    On Error GoTo Error_PonTotalFactura
+    Dim strSQL As String, curTotal As Currency, curBaseRet As Currency
+    curTotal = Nz(DSum("[Precio]*(1+[%IVA]/100)", "Facturas lineas", "[Nro Documento] = " & lngNroFactura), 0)
+    curTotal = Round(curTotal, 2)
+    curBaseRet = Nz(DSum("[Precio]", "Facturas lineas", "[Nro Documento] = " & lngNroFactura & " AND [%IVA]<>0"), 0)
+    curBaseRet = Round(curBaseRet, 2)
+    strSQL = "UPDATE [Facturas cabeceras] SET [Facturas cabeceras].TotalImporte = " & ComaPunto(curTotal)
+    strSQL = strSQL & ", BaseRetencionIRPF = " & ComaPunto(curBaseRet)
+    strSQL = strSQL & " WHERE ((([Facturas cabeceras].[Nro Documento])=" & lngNroFactura & "));"
+    CurrentDb.Execute strSQL, dbFailOnError + dbSeeChanges
+Salir_PonTotalFactura:
+    Exit Sub
+Error_PonTotalFactura:
+    Select Case Err
+        Case Else
+            MsgBox "Error nº " & Err & " en PonTotalFactura" & vbCrLf & Err.Description
+            Resume Salir_PonTotalFactura
+    End Select
+End Sub

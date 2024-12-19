@@ -2,6 +2,7 @@ Option Compare Database
 Option Explicit
 
 Public Function ComprobarVinculos()
+    On Error GoTo HandleError
     Dim strCurDir As String, intR As Integer, strSQL As String
     Dim strCarDatos As String, strCarDatos0 As String
     strCurDir = miDirectorioDe(CurrentDb.Name)
@@ -9,31 +10,34 @@ Public Function ComprobarVinculos()
         Call Titulo_e_Icono
         Exit Function
     Else
-        DoCmd.OpenForm "frm1"
-        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de Datos", "Carpeta Datos", strCurDir, , , , , True)
-        If strCarDatos = "" Then
-            MsgBox "Se cerrará la aplicación"
-            DoCmd.Quit
-        End If
-        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
-        DoCmd.Close acForm, "frm1"
-        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
-        strSQL = strSQL & " WHERE FicheroDeConexion Like 'GESTO-DA.mdb' OR FicheroDeConexion Like 'GESTO-DT_*.mdb' OR FicheroDeConexion Like 'GESTO-CFG.mdb'"
-        CurrentDb.Execute strSQL, dbFailOnError
-        strCarDatos0 = strCarDatos
-        DoCmd.OpenForm "frm1"
-        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de SIGA (bdVersion5xp.mdb)", "Carpeta SIGA", strCurDir, , , , , True)
-        If strCarDatos = "" Then
-            MsgBox "Se cerrará la aplicación"
-            DoCmd.Quit
-        End If
-        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
-        DoCmd.Close acForm, "frm1"
-        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
-        strSQL = strSQL & " WHERE FicheroDeConexion Like 'bdVersion5xp.mdb'"
-        CurrentDb.Execute strSQL, dbFailOnError
         
-        ReconectarTablasYaVinculadas
+        
+        
+'        DoCmd.OpenForm "frm1"
+'        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de Datos", "Carpeta Datos", strCurDir, , , , , True)
+'        If strCarDatos = "" Then
+'            MsgBox "Se cerrará la aplicación"
+'            DoCmd.Quit
+'        End If
+'        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
+'        DoCmd.Close acForm, "frm1"
+'        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
+'        strSQL = strSQL & " WHERE FicheroDeConexion Like 'GESTO-DA.mdb' OR FicheroDeConexion Like 'GESTO-DT_*.mdb' OR FicheroDeConexion Like 'GESTO-CFG.mdb'"
+'        CurrentDb.Execute strSQL, dbFailOnError
+'        strCarDatos0 = strCarDatos
+'        DoCmd.OpenForm "frm1"
+'        strCarDatos = AbrirDialogo(, , , , "Seleccionar Carpeta de SIGA (bdVersion5xp.mdb)", "Carpeta SIGA", strCurDir, , , , , True)
+'        If strCarDatos = "" Then
+'            MsgBox "Se cerrará la aplicación"
+'            DoCmd.Quit
+'        End If
+'        If Right(strCarDatos, 1) <> "\" Then strCarDatos = strCarDatos & "\"
+'        DoCmd.Close acForm, "frm1"
+'        strSQL = "UPDATE 1myConexionTablas SET [1myConexionTablas].DirectorioActual = False, [1myConexionTablas].DirectorioDeConexion = " & ConComillas(strCarDatos)
+'        strSQL = strSQL & " WHERE FicheroDeConexion Like 'bdVersion5xp.mdb'"
+'        CurrentDb.Execute strSQL, dbFailOnError
+        ReconectarTablasSQLServer
+        ReconectarTablasYaVinculadas    'AUX y SYS...
         SetParam "CarpetaDatos", strCarDatos0
         intR = MsgBox("¿Volver a vincular la próxima vez que se inice el programa?", vbDefaultButton2 + vbYesNo + vbQuestion)
         If intR = vbNo Then
@@ -43,6 +47,13 @@ Public Function ComprobarVinculos()
         End If
     End If
     Call Titulo_e_Icono
+    
+    
+HandleExit:
+    Exit Function
+HandleError:
+    MsgBox Err.Description
+    Resume HandleExit
 End Function
 
 Private Function miDirectorioDe(strFullPath As String) As String
@@ -112,7 +123,7 @@ Error_ComprobarOpciones:
     Select Case Err
         Case Else
             MsgBox "Error nº " & Err & " en ComprobarOpciones" & vbCrLf & Err.Description
-            Resume 'Salir_ComprobarOpciones
+            Resume Salir_ComprobarOpciones
     End Select
     
 End Function
@@ -148,7 +159,7 @@ End Function
 Public Function Titulo_e_Icono()
     Dim intX As Integer
     Dim strPath As String, strTitulo As String, strIco As String
-    strTitulo = NuloEs(GetParam("AplicacionTitulo"), "G4-GESTALEGRIA")
+    strTitulo = spnz(GetParam("AplicacionTitulo"), "Gesto")
     intX = AddPropAp("AppTitle", dbText, strTitulo)
     strPath = miDirectorioDe(CurrentDb.Name)
     strIco = GetParam("CarpetaDatos") & NuloEs(GetParam("AplicacionIcono"), "gA.ico")
@@ -160,7 +171,7 @@ Public Function Titulo_e_Icono()
 End Function
 
 Public Function AddPropAp(strName As String, varType As Variant, varValue As Variant) As Integer
-    Dim dbs As DAO.Database, prp As Object
+    Dim dbs As dao.Database, prp As Object
     Const conPropNotFoundError = 3270
 
     Set dbs = CurrentDb

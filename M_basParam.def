@@ -210,7 +210,7 @@ Private Function DimeValue(vValue As Variant, iTipo As Integer) As String
             Case 5, 6, 7
                 DimeValue = ComaPunto(CStr(vValue))
             Case 8
-                DimeValue = ConComillas(Format(CDate(vValue), "yyy-mm-dd"), True)
+                DimeValue = ConComillas(Format(CDate(vValue), "yyyy-mm-dd"), True)
             Case Else
                 DimeValue = ConComillas(CStr(vValue), True)
         End Select
@@ -277,7 +277,7 @@ End Function
 Public Function PonValorParam_old(strNP As String, vVP As Variant, Optional intTipoDato As Integer = 10, Optional intMsg As Integer = True, Optional intForzarTipoDato As Integer = False) As Integer
     'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
     On Error GoTo Error_PonValorParam
-    Dim db As DAO.Database, rs As Recordset, strTable As String ', strFile As String
+    Dim db As dao.Database, rs As Recordset, strTable As String ', strFile As String
     'If strNP Like "Puesto*" Then
     '    strTable = "pstParam"
     '    strFile = "R4PST.mdb"
@@ -373,7 +373,7 @@ Public Function PonValorParamRemoto(strMDB As String, strNP As String, vVP As Va
     'Graba el valor vVP en el parámetro strNP, si el parámetro no existe lo crea con el tipo indicado
     On Error GoTo Error_PonValorParamRemoto
     Dim rs As Recordset
-    Dim db As DAO.Database
+    Dim db As dao.Database
     Set db = OpenDatabase(strMDB)
     If strNP Like "Puesto*" Then
         Set rs = db.OpenRecordset("pstParam", dbOpenDynaset, dbSeeChanges)
@@ -429,7 +429,7 @@ End Function
 Public Function DameValorParamRemoto(strMDB As String, strNP As String, Optional strTable As String = "cfgParam", Optional ByRef intOK As Integer = False) As Variant
     'Devuelve el valor del parámetro encontrado, si el parámetro no existe Devuelve ""
     On Error GoTo Error_DameValorParamRemoto
-    Dim rs As Recordset, vVP As Variant, db As DAO.Database
+    Dim rs As Recordset, vVP As Variant, db As dao.Database
     Set db = OpenDatabase(strMDB, , True)
     Set rs = db.OpenRecordset(strTable, dbOpenSnapshot)
     rs.FindFirst "NP = '" & strNP & "'"
